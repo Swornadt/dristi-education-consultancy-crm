@@ -6,6 +6,7 @@ import { NAV_ITEMS } from './config/modules';
 import AppLayout from './layouts/AppLayout';
 import DashboardPage from './pages/DashboardPage';
 import ForbiddenPage from './pages/ForbiddenPage';
+import LeadsPage from './pages/leads/LeadsPage';
 import LoginPage from './pages/LoginPage';
 import ModulePlaceholder from './pages/ModulePlaceholder';
 import NotFoundPage from './pages/NotFoundPage';
@@ -15,6 +16,7 @@ import { theme } from './theme';
 // Pages that need sub-routes (e.g. /leads/12) can render their own <Routes> inside.
 const PAGES = {
   dashboard: <DashboardPage />,
+  leads: <LeadsPage />,
 };
 
 // "/" sends each role to the first module it can view (front desk has no dashboard, for example).

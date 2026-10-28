@@ -59,3 +59,17 @@ Routes use `/leads/*`, so the page can handle `/leads/12` with its own nested `<
 - `can('leads', 'create')` from `useAuth()` returns true or false.
 - `scopeOf('leads', 'view')` returns `'own'` or `'all'`, handy for labels like "My leads".
 - Hiding a button is only for tidiness. The server enforces every permission.
+
+## Leads module (src/pages/leads)
+
+- `LeadListPage`: server-side search, filters, sorting and pagination (`GET /leads`). The counselor filter only shows for roles with `all` scope.
+- `LeadFormModal`: add and edit a lead. On create, empty fields are omitted; on edit, cleared fields are sent as `null`.
+- `LeadDetailPage`: details, status change (marking as lost asks for a reason), reassign, convert to student, delete.
+- `ActivityPanel`: timeline plus an add-activity form.
+
+Notes for the backend:
+
+- `GET /leads/:id/activities` and `GET /countries` are read as either a plain array or `{ data, meta }`.
+- `PATCH /leads/:id` should accept `null` to clear `email`, `phone`, `destinationCountryId`, `desiredIntake`, `assignedTo` and `notes`.
+- Validation errors should use the contract format; `details[].field` names (`fullName`, `phone`, `email`, `desiredIntake`) are mapped onto the form fields.
+- Assigning and status changes are expected to add `status_change` entries to the timeline.

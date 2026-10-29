@@ -1,0 +1,1833 @@
+diff --git a/src/App.jsx b/src/App.jsx
+index 0a1a2a0..8a5ff28 100644
+--- a/src/App.jsx
++++ b/src/App.jsx
+@@ -10,6 +10,7 @@ import LeadsPage from './pages/leads/LeadsPage';
+ import LoginPage from './pages/LoginPage';
+ import ModulePlaceholder from './pages/ModulePlaceholder';
+ import NotFoundPage from './pages/NotFoundPage';
++import StudentsPage from './pages/students/StudentsPage';
+ import TasksPage from './pages/tasks/TasksPage';
+ import { theme } from './theme';
+ 
+@@ -19,6 +20,7 @@ const PAGES = {
+   dashboard: <DashboardPage />,
+   leads: <LeadsPage />,
+   tasks: <TasksPage />,
++  students: <StudentsPage />,
+ };
+ 
+ // "/" sends each role to the first module it can view (front desk has no dashboard, for example).
+diff --git a/src/api/documentTypes.js b/src/api/documentTypes.js
+new file mode 100644
+index 0000000..d9db8d7
+--- /dev/null
++++ b/src/api/documentTypes.js
+@@ -0,0 +1,8 @@
++import api from './client';
++import { unwrapList } from './helpers';
++import { USE_MOCK } from './mode';
++import * as mock from '../mocks/documentTypes';
++
++// GET /document-types -> [{ id, name, inDefaultChecklist }]
++export const listDocumentTypes = () =>
++  USE_MOCK ? mock.listDocumentTypes() : api.get('/document-types').then((r) => unwrapList(r.data));
+diff --git a/src/api/files.js b/src/api/files.js
+new file mode 100644
+index 0000000..6356437
+--- /dev/null
++++ b/src/api/files.js
+@@ -0,0 +1,24 @@
++import api from './client';
++import { USE_MOCK } from './mode';
++import * as mock from '../mocks/files';
++
++// GET /files/:id needs the auth header, so we fetch the file as a blob
++// and hand it to the browser instead of linking to it directly.
++async function fetchFileBlob(fileId) {
++  if (USE_MOCK) return mock.getMockFileBlob(fileId);
++  const res = await api.get(`/files/${fileId}`, { responseType: 'blob' });
++  return res.data;
++}
++
++// file: { id, originalName }
++export async function downloadFile(file) {
++  const blob = await fetchFileBlob(file.id);
++  const url = URL.createObjectURL(blob);
++  const link = document.createElement('a');
++  link.href = url;
++  link.download = file.originalName;
++  document.body.appendChild(link);
++  link.click();
++  link.remove();
++  setTimeout(() => URL.revokeObjectURL(url), 1000);
++}
+diff --git a/src/api/students.js b/src/api/students.js
+new file mode 100644
+index 0000000..ffd8bfa
+--- /dev/null
++++ b/src/api/students.js
+@@ -0,0 +1,62 @@
++import api from './client';
++import { USE_MOCK } from './mode';
++import * as mock from '../mocks/students';
++
++const body = (promise) => promise.then((res) => res.data);
++const nothing = () => undefined;
++
++// GET /students -> { data, meta }. params: q, assignedTo, preferredCountryId, page, limit, sort
++export const listStudents = (params) => (USE_MOCK ? mock.listStudents(params) : body(api.get('/students', { params })));
++
++// Full profile, including education and testScores
++export const getStudent = (id) => (USE_MOCK ? mock.getStudent(id) : body(api.get(`/students/${id}`)));
++
++export const updateStudent = (id, payload) =>
++  USE_MOCK ? mock.updateStudent(id, payload) : body(api.patch(`/students/${id}`, payload));
++
++// PUT /students/:id/preferred-countries { countryIds }
++export const setPreferredCountries = (id, countryIds) =>
++  USE_MOCK
++    ? mock.setPreferredCountries(id, countryIds)
++    : api.put(`/students/${id}/preferred-countries`, { countryIds }).then(nothing);
++
++// ----- education -----
++export const addEducation = (id, payload) =>
++  USE_MOCK ? mock.addEducation(id, payload) : body(api.post(`/students/${id}/education`, payload));
++export const updateEducation = (id, eid, payload) =>
++  USE_MOCK ? mock.updateEducation(id, eid, payload) : body(api.patch(`/students/${id}/education/${eid}`, payload));
++export const deleteEducation = (id, eid) =>
++  USE_MOCK ? mock.deleteEducation(id, eid) : api.delete(`/students/${id}/education/${eid}`).then(nothing);
++
++// ----- test scores -----
++export const addTestScore = (id, payload) =>
++  USE_MOCK ? mock.addTestScore(id, payload) : body(api.post(`/students/${id}/test-scores`, payload));
++export const updateTestScore = (id, sid, payload) =>
++  USE_MOCK ? mock.updateTestScore(id, sid, payload) : body(api.patch(`/students/${id}/test-scores/${sid}`, payload));
++export const deleteTestScore = (id, sid) =>
++  USE_MOCK ? mock.deleteTestScore(id, sid) : api.delete(`/students/${id}/test-scores/${sid}`).then(nothing);
++
++// ----- document checklist -----
++// -> { checklist: [...], leadAttachments: [...] }
++export const listStudentDocuments = (id) =>
++  USE_MOCK ? mock.listStudentDocuments(id) : body(api.get(`/students/${id}/documents`));
++
++export const addChecklistItem = (id, documentTypeId) =>
++  USE_MOCK ? mock.addChecklistItem(id, documentTypeId) : body(api.post(`/students/${id}/documents`, { documentTypeId }));
++
++// { status?, remarks? }
++export const updateChecklistItem = (id, itemId, payload) =>
++  USE_MOCK
++    ? mock.updateChecklistItem(id, itemId, payload)
++    : body(api.patch(`/students/${id}/documents/${itemId}`, payload));
++
++// multipart/form-data with a single `file` field
++export const uploadChecklistFile = (id, itemId, file) => {
++  if (USE_MOCK) return mock.uploadChecklistFile(id, itemId, file);
++  const form = new FormData();
++  form.append('file', file);
++  return body(api.post(`/students/${id}/documents/${itemId}/file`, form));
++};
++
++export const deleteChecklistItem = (id, itemId) =>
++  USE_MOCK ? mock.deleteChecklistItem(id, itemId) : api.delete(`/students/${id}/documents/${itemId}`).then(nothing);
+diff --git a/src/config/studentOptions.js b/src/config/studentOptions.js
+new file mode 100644
+index 0000000..c89cbb7
+--- /dev/null
++++ b/src/config/studentOptions.js
+@@ -0,0 +1,42 @@
++const toOptions = (values) => values.map((v) => ({ value: v, label: v }));
++
++export const GENDERS = toOptions(['Female', 'Male', 'Other', 'Prefer not to say']);
++export const EDUCATION_LEVELS = toOptions(['High School', 'Diploma', 'Bachelor', 'Master', 'Other']);
++export const TEST_NAMES = toOptions(['IELTS', 'TOEFL', 'PTE', 'Duolingo', 'SAT', 'ACT', 'GRE', 'GMAT', 'Other']);
++
++// English tests that have four section scores.
++export const SECTION_TESTS = ['IELTS', 'TOEFL', 'PTE'];
++export const SECTIONS = [
++  { key: 'listening', label: 'Listening', short: 'L' },
++  { key: 'reading', label: 'Reading', short: 'R' },
++  { key: 'writing', label: 'Writing', short: 'W' },
++  { key: 'speaking', label: 'Speaking', short: 'S' },
++];
++
++// Allowed range for each test's overall score (used to limit the number inputs).
++export const TEST_RANGES = {
++  IELTS: { min: 0, max: 9, step: 0.5 },
++  TOEFL: { min: 0, max: 120, step: 1 },
++  PTE: { min: 10, max: 90, step: 1 },
++  Duolingo: { min: 10, max: 160, step: 5 },
++  SAT: { min: 400, max: 1600, step: 10 },
++  ACT: { min: 1, max: 36, step: 1 },
++  GRE: { min: 260, max: 340, step: 1 },
++  GMAT: { min: 205, max: 805, step: 5 },
++  Other: { min: 0, max: 1000, step: 0.5 },
++};
++export const SECTION_RANGES = {
++  IELTS: { min: 0, max: 9, step: 0.5 },
++  TOEFL: { min: 0, max: 30, step: 1 },
++  PTE: { min: 10, max: 90, step: 1 },
++};
++
++export const DOC_STATUSES = [
++  { value: 'pending', label: 'Pending', color: 'default' },
++  { value: 'received', label: 'Received', color: 'blue' },
++  { value: 'verified', label: 'Verified', color: 'green' },
++];
++
++export const MAX_UPLOAD_MB = 10;
++export const ALLOWED_UPLOAD_EXTENSIONS = ['pdf', 'jpg', 'jpeg', 'png', 'docx'];
++export const UPLOAD_ACCEPT = ALLOWED_UPLOAD_EXTENSIONS.map((e) => `.${e}`).join(',');
+diff --git a/src/mocks/documentTypes.js b/src/mocks/documentTypes.js
+new file mode 100644
+index 0000000..b1bb5fe
+--- /dev/null
++++ b/src/mocks/documentTypes.js
+@@ -0,0 +1,17 @@
++export const DOCUMENT_TYPES = [
++  { id: 1, name: 'Passport', inDefaultChecklist: true },
++  { id: 2, name: 'Academic Transcripts', inDefaultChecklist: true },
++  { id: 3, name: 'Academic Certificates', inDefaultChecklist: true },
++  { id: 4, name: 'English Test Result', inDefaultChecklist: true },
++  { id: 5, name: 'Statement of Purpose (SOP)', inDefaultChecklist: true },
++  { id: 6, name: 'Recommendation Letter', inDefaultChecklist: true },
++  { id: 7, name: 'CV / Resume', inDefaultChecklist: true },
++  { id: 8, name: 'Passport-size Photo', inDefaultChecklist: false },
++  { id: 9, name: 'Financial Documents', inDefaultChecklist: false },
++  { id: 10, name: 'Other', inDefaultChecklist: false },
++];
++
++export async function listDocumentTypes() {
++  await new Promise((resolve) => setTimeout(resolve, 100));
++  return DOCUMENT_TYPES.map((t) => ({ ...t }));
++}
+diff --git a/src/mocks/files.js b/src/mocks/files.js
+new file mode 100644
+index 0000000..6c89f80
+--- /dev/null
++++ b/src/mocks/files.js
+@@ -0,0 +1,30 @@
++// Keeps uploaded files in memory so download works in mock mode (lost on page refresh).
++import { ApiError } from '../api/ApiError';
++
++const store = new Map();
++let nextFileId = 1;
++
++export function saveMockFile(file) {
++  const meta = {
++    id: nextFileId++,
++    originalName: file.name,
++    mimeType: file.type || 'application/octet-stream',
++    sizeBytes: file.size,
++  };
++  store.set(meta.id, { blob: file, meta });
++  return { ...meta };
++}
++
++// Placeholder file for seeded checklist items.
++export function seedMockFile(name, mimeType = 'application/pdf') {
++  const blob = new Blob([`Sample document: ${name}`], { type: 'text/plain' });
++  const meta = { id: nextFileId++, originalName: name, mimeType, sizeBytes: blob.size };
++  store.set(meta.id, { blob, meta });
++  return { ...meta };
++}
++
++export async function getMockFileBlob(id) {
++  const entry = store.get(Number(id));
++  if (!entry) throw new ApiError(404, 'NOT_FOUND', 'File not found.');
++  return entry.blob;
++}
+diff --git a/src/mocks/leads.js b/src/mocks/leads.js
+index 99e426b..7559693 100644
+--- a/src/mocks/leads.js
++++ b/src/mocks/leads.js
+@@ -36,7 +36,7 @@ const TERMS = ['fall', 'spring', 'summer', 'fall', 'winter'];
+ 
+ let nextLeadId = NAMES.length + 1;
+ let nextActivityId = 1;
+-let nextStudentId = 100;
++let nextStudentId = 200;
+ 
+ const activities = [];
+ const addActivityRow = (leadId, type, content, userId, occurredAt = nowIso()) => {
+@@ -273,3 +273,5 @@ export async function addActivity(id, { type, content } = {}) {
+ 
+ // Lets other mock modules (tasks) look up a lead.
+ export const findMockLead = (id) => leads.find((l) => l.id === Number(id));
++
++export const getMockConvertedLeads = () => leads.filter((l) => l.studentId);
+diff --git a/src/mocks/students.js b/src/mocks/students.js
+new file mode 100644
+index 0000000..777431b
+--- /dev/null
++++ b/src/mocks/students.js
+@@ -0,0 +1,323 @@
++// In-memory fake of the students endpoints (profile, education, test scores, document checklist).
++// Students are created lazily from converted leads, so converting a lead in the UI produces a student.
++// Scope "own" = assigned to or created by the user.
++import { ApiError } from '../api/ApiError';
++import { getMockCurrentUser } from './auth';
++import { COUNTRIES, USER_NAMES } from './data';
++import { DOCUMENT_TYPES } from './documentTypes';
++import { saveMockFile, seedMockFile } from './files';
++import { getMockConvertedLeads } from './leads';
++
++const delay = (ms = 200) => new Promise((resolve) => setTimeout(resolve, ms));
++const copy = (value) => JSON.parse(JSON.stringify(value));
++const nowIso = () => new Date().toISOString();
++const person = (id) => (id ? { id: Number(id), fullName: USER_NAMES[id] ?? `User ${id}` } : null);
++const country = (id) => {
++  const c = COUNTRIES.find((x) => x.id === Number(id));
++  return c ? { id: c.id, name: c.name } : null;
++};
++const validation = (details) => new ApiError(400, 'VALIDATION_ERROR', 'Invalid request', details);
++
++const DOBS = ['2002-03-14', '2003-07-21', '2001-11-05', '2004-01-30'];
++const COURSES = ['Nursing', 'Computer Science', 'Business Administration', 'Public Health'];
++
++let nextEducationId = 1;
++let nextScoreId = 1;
++let nextItemId = 1;
++
++const students = [];
++const checklists = new Map(); // studentId -> checklist items
++
++function defaultChecklist(studentId, seeded) {
++  return DOCUMENT_TYPES.filter((t) => t.inDefaultChecklist).map((type, index) => {
++    // Seeded students get a mix of statuses so the checklist looks lived-in.
++    const status = !seeded ? 'pending' : index < 3 ? 'verified' : index < 5 ? 'received' : 'pending';
++    const file = status === 'pending' ? null : seedMockFile(`${type.name.replace(/[^A-Za-z]+/g, '_')}.pdf`);
++    return {
++      id: nextItemId++,
++      studentId,
++      documentType: { id: type.id, name: type.name },
++      status,
++      file,
++      remarks: null,
++      verifiedBy: status === 'verified' ? person(3) : null,
++      verifiedAt: status === 'verified' ? nowIso() : null,
++    };
++  });
++}
++
++function buildStudent(lead) {
++  const id = lead.studentId;
++  const seeded = id < 200;
++  const n = id % 4;
++  const student = {
++    id,
++    leadId: lead.id,
++    fullName: lead.fullName,
++    email: lead.email,
++    phone: lead.phone,
++    dateOfBirth: seeded ? DOBS[n] : null,
++    gender: seeded ? (n % 2 ? 'Male' : 'Female') : null,
++    nationality: seeded ? 'Nepali' : null,
++    address: seeded && n !== 0 ? 'Kathmandu' : null,
++    guardianName: seeded && n > 1 ? 'Parent / Guardian' : null,
++    guardianPhone: seeded && n > 1 ? '+977-9800000000' : null,
++    preferredCourses: seeded ? COURSES[n] : null,
++    notes: null,
++    preferredCountries: lead.destinationCountry ? [{ ...lead.destinationCountry }] : [],
++    assignedTo: lead.assignedTo ? { ...lead.assignedTo } : null,
++    createdBy: lead.assignedTo ? { ...lead.assignedTo } : person(1),
++    education: seeded
++      ? [
++          { id: nextEducationId++, level: 'High School', institution: 'Sample Secondary School', fieldOfStudy: 'Science', startYear: 2018, endYear: 2020, grade: '3.4 GPA' },
++          ...(n > 1 ? [{ id: nextEducationId++, level: 'Bachelor', institution: 'Sample University', fieldOfStudy: COURSES[n], startYear: 2021, endYear: 2025, grade: '3.1 GPA' }] : []),
++        ]
++      : [],
++    testScores: seeded
++      ? [{ id: nextScoreId++, testName: 'IELTS', overallScore: 6.5, sectionScores: { listening: 7, reading: 6.5, writing: 6, speaking: 6.5 }, testDate: '2026-09-20' }]
++      : [],
++    createdAt: lead.convertedAt || nowIso(),
++    updatedAt: lead.convertedAt || nowIso(),
++  };
++  students.push(student);
++  checklists.set(id, defaultChecklist(id, seeded));
++}
++
++// Create a student for any converted lead that does not have one yet.
++function sync() {
++  getMockConvertedLeads().forEach((lead) => {
++    if (!students.some((s) => s.id === lead.studentId)) buildStudent(lead);
++  });
++}
++
++// ---------- permission helpers ----------
++function access(module, action) {
++  const user = getMockCurrentUser();
++  if (!user) throw new ApiError(401, 'UNAUTHENTICATED', 'Session expired. Please sign in again.');
++  const permission = user.permissions.find((p) => p.module === module && p.action === action);
++  if (!permission) throw new ApiError(403, 'FORBIDDEN', "You don't have permission to do that.");
++  return { user, scope: permission.scope };
++}
++
++const inScope = (student, user, scope) =>
++  scope === 'all' || student.assignedTo?.id === user.id || student.createdBy?.id === user.id;
++
++function findStudent(id, action) {
++  sync();
++  const { user, scope } = access('students', action);
++  const student = students.find((s) => s.id === Number(id));
++  if (!student || !inScope(student, user, scope)) throw new ApiError(404, 'NOT_FOUND', 'Student not found.');
++  return { student, user };
++}
++
++// ---------- students ----------
++const summary = ({ education, testScores, ...rest }) => rest;
++
++export async function listStudents(params = {}) {
++  await delay();
++  sync();
++  const { user, scope } = access('students', 'view');
++  const { page = 1, limit = 20, sort = '-createdAt', q, assignedTo, preferredCountryId } = params;
++
++  let rows = students.filter((s) => inScope(s, user, scope));
++  if (assignedTo) rows = rows.filter((s) => s.assignedTo?.id === Number(assignedTo));
++  if (preferredCountryId) rows = rows.filter((s) => s.preferredCountries.some((c) => c.id === Number(preferredCountryId)));
++  if (q) {
++    const needle = String(q).toLowerCase();
++    rows = rows.filter((s) => [s.fullName, s.email, s.phone].some((v) => v && v.toLowerCase().includes(needle)));
++  }
++
++  const descending = sort.startsWith('-');
++  const field = sort.replace(/^-/, '');
++  rows = [...rows].sort((a, b) => {
++    const cmp = String(a[field]).localeCompare(String(b[field]));
++    return descending ? -cmp : cmp;
++  });
++
++  const total = rows.length;
++  const start = (Number(page) - 1) * Number(limit);
++  return {
++    data: copy(rows.slice(start, start + Number(limit)).map(summary)),
++    meta: { page: Number(page), limit: Number(limit), total, totalPages: Math.max(1, Math.ceil(total / Number(limit))) },
++  };
++}
++
++export async function getStudent(id) {
++  await delay();
++  return copy(findStudent(id, 'view').student);
++}
++
++export async function updateStudent(id, payload) {
++  await delay();
++  const { student } = findStudent(id, 'update');
++  if ('fullName' in payload && !String(payload.fullName ?? '').trim()) {
++    throw validation([{ field: 'fullName', message: "Enter the student's name." }]);
++  }
++  ['fullName', 'email', 'phone', 'dateOfBirth', 'gender', 'nationality', 'address', 'guardianName', 'guardianPhone', 'preferredCourses', 'notes'].forEach((key) => {
++    if (key in payload) student[key] = typeof payload[key] === 'string' ? payload[key].trim() || null : payload[key] ?? null;
++  });
++  if (payload.assignedTo) student.assignedTo = person(payload.assignedTo);
++  student.updatedAt = nowIso();
++  return copy(student);
++}
++
++export async function setPreferredCountries(id, countryIds = []) {
++  await delay();
++  const { student } = findStudent(id, 'update');
++  const found = countryIds.map(country);
++  if (found.some((c) => !c)) throw validation([{ field: 'countryIds', message: 'Choose valid countries.' }]);
++  student.preferredCountries = found;
++}
++
++// ---------- education and test scores ----------
++function validateEducation(payload) {
++  const details = [];
++  if (!payload.level?.trim()) details.push({ field: 'level', message: 'Choose a level.' });
++  if (!payload.institution?.trim()) details.push({ field: 'institution', message: 'Enter the institution.' });
++  if (payload.startYear && payload.endYear && payload.endYear < payload.startYear) {
++    details.push({ field: 'endYear', message: 'End year cannot be before the start year.' });
++  }
++  if (details.length) throw validation(details);
++}
++
++const educationFields = (p) => ({
++  level: p.level.trim(),
++  institution: p.institution.trim(),
++  fieldOfStudy: p.fieldOfStudy?.trim() || null,
++  startYear: p.startYear ?? null,
++  endYear: p.endYear ?? null,
++  grade: p.grade?.trim() || null,
++});
++
++export async function addEducation(id, payload) {
++  await delay();
++  const { student } = findStudent(id, 'update');
++  validateEducation(payload);
++  const row = { id: nextEducationId++, ...educationFields(payload) };
++  student.education.push(row);
++  return copy(row);
++}
++
++export async function updateEducation(id, eid, payload) {
++  await delay();
++  const { student } = findStudent(id, 'update');
++  const row = student.education.find((e) => e.id === Number(eid));
++  if (!row) throw new ApiError(404, 'NOT_FOUND', 'Education record not found.');
++  validateEducation({ ...row, ...payload });
++  Object.assign(row, educationFields({ ...row, ...payload }));
++  return copy(row);
++}
++
++export async function deleteEducation(id, eid) {
++  await delay();
++  const { student } = findStudent(id, 'update');
++  student.education = student.education.filter((e) => e.id !== Number(eid));
++}
++
++const TESTS = ['IELTS', 'TOEFL', 'PTE', 'Duolingo', 'SAT', 'ACT', 'GRE', 'GMAT', 'Other'];
++
++function validateScore(payload) {
++  if (!TESTS.includes(payload.testName)) throw validation([{ field: 'testName', message: 'Choose a test.' }]);
++}
++
++const scoreFields = (p) => ({
++  testName: p.testName,
++  overallScore: p.overallScore ?? null,
++  sectionScores: p.sectionScores ?? null,
++  testDate: p.testDate ?? null,
++});
++
++export async function addTestScore(id, payload) {
++  await delay();
++  const { student } = findStudent(id, 'update');
++  validateScore(payload);
++  const row = { id: nextScoreId++, ...scoreFields(payload) };
++  student.testScores.push(row);
++  return copy(row);
++}
++
++export async function updateTestScore(id, sid, payload) {
++  await delay();
++  const { student } = findStudent(id, 'update');
++  const row = student.testScores.find((t) => t.id === Number(sid));
++  if (!row) throw new ApiError(404, 'NOT_FOUND', 'Test score not found.');
++  validateScore({ ...row, ...payload });
++  Object.assign(row, scoreFields({ ...row, ...payload }));
++  return copy(row);
++}
++
++export async function deleteTestScore(id, sid) {
++  await delay();
++  const { student } = findStudent(id, 'update');
++  student.testScores = student.testScores.filter((t) => t.id !== Number(sid));
++}
++
++// ---------- document checklist ----------
++function findItem(student, itemId) {
++  const item = (checklists.get(student.id) ?? []).find((i) => i.id === Number(itemId));
++  if (!item) throw new ApiError(404, 'NOT_FOUND', 'Checklist item not found.');
++  return item;
++}
++
++const serializeItem = ({ studentId, ...item }) => copy(item);
++
++export async function listStudentDocuments(id) {
++  await delay();
++  const { student } = findStudent(id, 'view');
++  access('documents', 'view');
++  // Documents attached to the original lead would appear in leadAttachments; none in the mock.
++  return { checklist: (checklists.get(student.id) ?? []).map(serializeItem), leadAttachments: [] };
++}
++
++export async function addChecklistItem(id, documentTypeId) {
++  await delay();
++  const { student } = findStudent(id, 'view');
++  access('documents', 'create');
++  const type = DOCUMENT_TYPES.find((t) => t.id === Number(documentTypeId));
++  if (!type) throw validation([{ field: 'documentTypeId', message: 'Choose a document type.' }]);
++  const list = checklists.get(student.id);
++  if (list.some((i) => i.documentType.id === type.id)) {
++    throw new ApiError(409, 'CONFLICT', 'That document is already on the checklist.');
++  }
++  const item = {
++    id: nextItemId++, studentId: student.id, documentType: { id: type.id, name: type.name },
++    status: 'pending', file: null, remarks: null, verifiedBy: null, verifiedAt: null,
++  };
++  list.push(item);
++  return serializeItem(item);
++}
++
++export async function updateChecklistItem(id, itemId, payload) {
++  await delay(150);
++  const { student, user } = findStudent(id, 'view');
++  access('documents', 'update');
++  const item = findItem(student, itemId);
++  if ('status' in payload) {
++    if (!['pending', 'received', 'verified'].includes(payload.status)) {
++      throw validation([{ field: 'status', message: 'Choose a valid status.' }]);
++    }
++    item.status = payload.status;
++    item.verifiedBy = payload.status === 'verified' ? person(user.id) : null;
++    item.verifiedAt = payload.status === 'verified' ? nowIso() : null;
++  }
++  if ('remarks' in payload) item.remarks = payload.remarks?.trim() || null;
++  return serializeItem(item);
++}
++
++export async function uploadChecklistFile(id, itemId, file) {
++  await delay(400);
++  const { student } = findStudent(id, 'view');
++  access('documents', 'create');
++  const item = findItem(student, itemId);
++  item.file = saveMockFile(file);
++  if (item.status === 'pending') item.status = 'received';
++  return serializeItem(item);
++}
++
++export async function deleteChecklistItem(id, itemId) {
++  await delay();
++  const { student } = findStudent(id, 'view');
++  access('documents', 'delete');
++  const item = findItem(student, itemId);
++  checklists.set(student.id, checklists.get(student.id).filter((i) => i !== item));
++}
+diff --git a/src/pages/students/DocumentChecklist.jsx b/src/pages/students/DocumentChecklist.jsx
+new file mode 100644
+index 0000000..e6189d0
+--- /dev/null
++++ b/src/pages/students/DocumentChecklist.jsx
+@@ -0,0 +1,262 @@
++import { useCallback, useEffect, useState } from 'react';
++import { Alert, Button, Card, Empty, Input, List, Popconfirm, Progress, Select, Space, Table, Tag, Typography, Upload, message } from 'antd';
++import { DeleteOutlined, DownloadOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons';
++import { listDocumentTypes } from '../../api/documentTypes';
++import { downloadFile } from '../../api/files';
++import {
++  addChecklistItem,
++  deleteChecklistItem,
++  listStudentDocuments,
++  updateChecklistItem,
++  uploadChecklistFile,
++} from '../../api/students';
++import { useAuth } from '../../auth/AuthContext';
++import Can from '../../components/Can';
++import { labelOf } from '../../config/leadOptions';
++import { DOC_STATUSES, UPLOAD_ACCEPT } from '../../config/studentOptions';
++import { formatDate } from '../../utils/format';
++import { formatFileSize, validateUpload } from '../../utils/files';
++
++export default function DocumentChecklist({ studentId }) {
++  const { can } = useAuth();
++  const [messageApi, contextHolder] = message.useMessage();
++  const [data, setData] = useState({ checklist: [], leadAttachments: [] });
++  const [docTypes, setDocTypes] = useState([]);
++  const [loading, setLoading] = useState(true);
++  const [error, setError] = useState(null);
++  const [busy, setBusy] = useState(false);
++  const [newType, setNewType] = useState(null);
++
++  const load = useCallback(async () => {
++    try {
++      setData(await listStudentDocuments(studentId));
++      setError(null);
++    } catch (err) {
++      setError(err.message);
++    } finally {
++      setLoading(false);
++    }
++  }, [studentId]);
++
++  useEffect(() => {
++    setLoading(true);
++    load();
++  }, [load]);
++
++  useEffect(() => {
++    listDocumentTypes()
++      .then(setDocTypes)
++      .catch(() => {});
++  }, []);
++
++  // Runs an action, shows the result and refreshes. Returns true on success.
++  const run = async (action, successText) => {
++    setBusy(true);
++    try {
++      await action();
++      if (successText) messageApi.success(successText);
++      await load();
++      return true;
++    } catch (err) {
++      messageApi.error(err.message);
++      return false;
++    } finally {
++      setBusy(false);
++    }
++  };
++
++  const handleDownload = async (file) => {
++    try {
++      await downloadFile(file);
++    } catch (err) {
++      messageApi.error(err.message);
++    }
++  };
++
++  const canUpdate = can('documents', 'update');
++  const { checklist, leadAttachments } = data;
++  const verified = checklist.filter((i) => i.status === 'verified').length;
++  const availableTypes = docTypes.filter((t) => !checklist.some((i) => i.documentType.id === t.id));
++
++  const columns = [
++    { title: 'Document', dataIndex: ['documentType', 'name'] },
++    {
++      title: 'Status',
++      width: 150,
++      render: (_, item) =>
++        canUpdate ? (
++          <Select
++            size="small"
++            style={{ width: 120 }}
++            value={item.status}
++            disabled={busy}
++            options={DOC_STATUSES}
++            onChange={(status) => run(() => updateChecklistItem(studentId, item.id, { status }), 'Status updated')}
++          />
++        ) : (
++          <Tag color={DOC_STATUSES.find((s) => s.value === item.status)?.color}>{labelOf(DOC_STATUSES, item.status)}</Tag>
++        ),
++    },
++    {
++      title: 'File',
++      width: 220,
++      render: (_, item) =>
++        item.file ? (
++          <Button type="link" size="small" icon={<DownloadOutlined />} onClick={() => handleDownload(item.file)} style={{ padding: 0 }}>
++            {item.file.originalName} ({formatFileSize(item.file.sizeBytes)})
++          </Button>
++        ) : (
++          <Typography.Text type="secondary">No file</Typography.Text>
++        ),
++    },
++    {
++      title: 'Remarks',
++      width: 220,
++      render: (_, item) =>
++        canUpdate ? (
++          <Input
++            key={`${item.id}-${item.remarks ?? ''}`}
++            size="small"
++            variant="borderless"
++            placeholder="Add remarks"
++            defaultValue={item.remarks ?? ''}
++            onPressEnter={(e) => e.target.blur()}
++            onBlur={(e) => {
++              const value = e.target.value.trim();
++              if (value !== (item.remarks ?? '')) run(() => updateChecklistItem(studentId, item.id, { remarks: value || null }));
++            }}
++          />
++        ) : (
++          item.remarks ?? '-'
++        ),
++    },
++    {
++      title: '',
++      width: 170,
++      render: (_, item) => (
++        <Space size={4}>
++          <Can module="documents" action="create">
++            <Upload
++              showUploadList={false}
++              accept={UPLOAD_ACCEPT}
++              disabled={busy}
++              beforeUpload={(file) => {
++                const problem = validateUpload(file);
++                if (problem) {
++                  messageApi.error(problem);
++                  return Upload.LIST_IGNORE;
++                }
++                return true;
++              }}
++              customRequest={({ file, onSuccess, onError }) => {
++                run(() => uploadChecklistFile(studentId, item.id, file), 'File uploaded').then((ok) =>
++                  ok ? onSuccess({}) : onError(new Error('Upload failed'))
++                );
++              }}
++            >
++              <Button size="small" icon={<UploadOutlined />} disabled={busy}>
++                {item.file ? 'Replace' : 'Upload'}
++              </Button>
++            </Upload>
++          </Can>
++          <Can module="documents" action="delete">
++            <Popconfirm
++              title="Remove from checklist?"
++              okText="Remove"
++              okButtonProps={{ danger: true }}
++              onConfirm={() => run(() => deleteChecklistItem(studentId, item.id), 'Removed from checklist')}
++            >
++              <Button size="small" type="text" danger icon={<DeleteOutlined />} aria-label="Remove from checklist" disabled={busy} />
++            </Popconfirm>
++          </Can>
++        </Space>
++      ),
++    },
++  ];
++
++  return (
++    <Card
++      title="Document checklist"
++      extra={
++        checklist.length > 0 && (
++          <Space>
++            <Typography.Text type="secondary">
++              {verified} of {checklist.length} verified
++            </Typography.Text>
++            <Progress
++              type="circle"
++              size={28}
++              percent={Math.round((verified / checklist.length) * 100)}
++              showInfo={false}
++            />
++          </Space>
++        )
++      }
++    >
++      {contextHolder}
++      {error && <Alert type="error" showIcon message={error} style={{ marginBottom: 16 }} />}
++
++      <Table
++        rowKey="id"
++        size="small"
++        columns={columns}
++        dataSource={checklist}
++        loading={loading}
++        pagination={false}
++        scroll={{ x: 860 }}
++        locale={{ emptyText: 'No documents on the checklist yet.' }}
++      />
++
++      <Can module="documents" action="create">
++        <Space style={{ marginTop: 16 }} wrap>
++          <Select
++            showSearch
++            optionFilterProp="label"
++            style={{ width: 260 }}
++            placeholder="Add a document type"
++            value={newType}
++            onChange={setNewType}
++            options={availableTypes.map((t) => ({ value: t.id, label: t.name }))}
++            notFoundContent="Everything is already on the checklist"
++          />
++          <Button
++            icon={<PlusOutlined />}
++            disabled={!newType || busy}
++            onClick={async () => {
++              if (await run(() => addChecklistItem(studentId, newType), 'Added to checklist')) setNewType(null);
++            }}
++          >
++            Add to checklist
++          </Button>
++        </Space>
++      </Can>
++
++      {leadAttachments.length > 0 && (
++        <div style={{ marginTop: 24 }}>
++          <Typography.Title level={5}>Attached while this was a lead</Typography.Title>
++          <List
++            size="small"
++            dataSource={leadAttachments}
++            renderItem={(doc) => (
++              <List.Item
++                actions={[
++                  <Button key="download" type="link" size="small" icon={<DownloadOutlined />} onClick={() => handleDownload(doc.file)}>
++                    Download
++                  </Button>,
++                ]}
++              >
++                <List.Item.Meta
++                  title={doc.file.originalName}
++                  description={[doc.documentType?.name, doc.note, formatDate(doc.createdAt)].filter(Boolean).join(' · ')}
++                />
++              </List.Item>
++            )}
++          />
++        </div>
++      )}
++      {!loading && checklist.length === 0 && leadAttachments.length === 0 && !error && (
++        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Add the documents this student needs to provide." style={{ marginTop: 16 }} />
++      )}
++    </Card>
++  );
++}
+diff --git a/src/pages/students/EducationPanel.jsx b/src/pages/students/EducationPanel.jsx
+new file mode 100644
+index 0000000..df5e19b
+--- /dev/null
++++ b/src/pages/students/EducationPanel.jsx
+@@ -0,0 +1,183 @@
++import { useState } from 'react';
++import { Alert, AutoComplete, Button, Card, Col, Form, Input, InputNumber, Modal, Popconfirm, Row, Space, Table, message } from 'antd';
++import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
++import { addEducation, deleteEducation, updateEducation } from '../../api/students';
++import { useAuth } from '../../auth/AuthContext';
++import { EDUCATION_LEVELS } from '../../config/studentOptions';
++
++const thisYear = new Date().getFullYear();
++
++function EducationModal({ open, studentId, record, onClose, onSaved }) {
++  const [form] = Form.useForm();
++  const [saving, setSaving] = useState(false);
++  const [error, setError] = useState(null);
++  const isEdit = Boolean(record);
++
++  const handleOk = async () => {
++    let values;
++    try {
++      values = await form.validateFields();
++    } catch {
++      return;
++    }
++    const payload = {
++      level: values.level.trim(),
++      institution: values.institution.trim(),
++      fieldOfStudy: values.fieldOfStudy?.trim() || null,
++      startYear: values.startYear ?? null,
++      endYear: values.endYear ?? null,
++      grade: values.grade?.trim() || null,
++    };
++    setSaving(true);
++    setError(null);
++    try {
++      if (isEdit) await updateEducation(studentId, record.id, payload);
++      else await addEducation(studentId, payload);
++      onSaved();
++    } catch (err) {
++      if (err.details?.length) form.setFields(err.details.map((d) => ({ name: d.field, errors: [d.message] })));
++      setError(err.message);
++    } finally {
++      setSaving(false);
++    }
++  };
++
++  return (
++    <Modal
++      title={isEdit ? 'Edit education' : 'Add education'}
++      open={open}
++      onCancel={onClose}
++      onOk={handleOk}
++      okText={isEdit ? 'Save changes' : 'Add'}
++      confirmLoading={saving}
++      destroyOnClose
++      maskClosable={false}
++    >
++      {error && <Alert type="error" showIcon message={error} style={{ marginBottom: 16 }} />}
++      <Form form={form} layout="vertical" initialValues={record ?? undefined} requiredMark={false}>
++        <Form.Item name="level" label="Level" rules={[{ required: true, whitespace: true, message: 'Choose or type a level.' }]}>
++          <AutoComplete options={EDUCATION_LEVELS} placeholder="For example: Bachelor" />
++        </Form.Item>
++        <Form.Item name="institution" label="Institution" rules={[{ required: true, whitespace: true, message: 'Enter the institution.' }]}>
++          <Input />
++        </Form.Item>
++        <Form.Item name="fieldOfStudy" label="Field of study">
++          <Input />
++        </Form.Item>
++        <Row gutter={16}>
++          <Col span={8}>
++            <Form.Item name="startYear" label="Start year">
++              <InputNumber min={1980} max={thisYear + 1} style={{ width: '100%' }} />
++            </Form.Item>
++          </Col>
++          <Col span={8}>
++            <Form.Item name="endYear" label="End year" dependencies={['startYear']}>
++              <InputNumber min={1980} max={thisYear + 8} style={{ width: '100%' }} />
++            </Form.Item>
++          </Col>
++          <Col span={8}>
++            <Form.Item name="grade" label="Grade">
++              <Input placeholder="GPA or %" />
++            </Form.Item>
++          </Col>
++        </Row>
++      </Form>
++    </Modal>
++  );
++}
++
++// Education history for a student. `onChanged` should reload the student.
++export default function EducationPanel({ student, onChanged }) {
++  const { can } = useAuth();
++  const [messageApi, contextHolder] = message.useMessage();
++  const [modalOpen, setModalOpen] = useState(false);
++  const [editing, setEditing] = useState(null);
++  const canUpdate = can('students', 'update');
++
++  const remove = async (record) => {
++    try {
++      await deleteEducation(student.id, record.id);
++      messageApi.success('Removed');
++      onChanged();
++    } catch (err) {
++      messageApi.error(err.message);
++    }
++  };
++
++  const columns = [
++    { title: 'Level', dataIndex: 'level' },
++    { title: 'Institution', dataIndex: 'institution' },
++    { title: 'Field', dataIndex: 'fieldOfStudy', render: (v) => v ?? '-' },
++    {
++      title: 'Years',
++      render: (_, r) => (r.startYear || r.endYear ? `${r.startYear ?? '?'} - ${r.endYear ?? '?'}` : '-'),
++    },
++    { title: 'Grade', dataIndex: 'grade', render: (v) => v ?? '-' },
++    ...(canUpdate
++      ? [
++          {
++            title: '',
++            width: 90,
++            render: (_, record) => (
++              <Space size={4}>
++                <Button
++                  type="text"
++                  icon={<EditOutlined />}
++                  aria-label="Edit education"
++                  onClick={() => {
++                    setEditing(record);
++                    setModalOpen(true);
++                  }}
++                />
++                <Popconfirm title="Remove this entry?" okText="Remove" okButtonProps={{ danger: true }} onConfirm={() => remove(record)}>
++                  <Button type="text" danger icon={<DeleteOutlined />} aria-label="Remove education" />
++                </Popconfirm>
++              </Space>
++            ),
++          },
++        ]
++      : []),
++  ];
++
++  return (
++    <Card
++      title="Education"
++      extra={
++        canUpdate && (
++          <Button
++            size="small"
++            icon={<PlusOutlined />}
++            onClick={() => {
++              setEditing(null);
++              setModalOpen(true);
++            }}
++          >
++            Add
++          </Button>
++        )
++      }
++    >
++      {contextHolder}
++      <Table
++        rowKey="id"
++        size="small"
++        columns={columns}
++        dataSource={student.education}
++        pagination={false}
++        scroll={{ x: 600 }}
++        locale={{ emptyText: 'No education history yet.' }}
++      />
++      <EducationModal
++        open={modalOpen}
++        studentId={student.id}
++        record={editing}
++        onClose={() => setModalOpen(false)}
++        onSaved={() => {
++          setModalOpen(false);
++          messageApi.success(editing ? 'Education updated' : 'Education added');
++          onChanged();
++        }}
++      />
++    </Card>
++  );
++}
+diff --git a/src/pages/students/StudentDetailPage.jsx b/src/pages/students/StudentDetailPage.jsx
+new file mode 100644
+index 0000000..b429325
+--- /dev/null
++++ b/src/pages/students/StudentDetailPage.jsx
+@@ -0,0 +1,201 @@
++import { useCallback, useEffect, useState } from 'react';
++import { Alert, Button, Card, Col, Descriptions, Result, Row, Select, Space, Spin, Tabs, Tag, Typography, message } from 'antd';
++import { ArrowLeftOutlined, EditOutlined, UserSwitchOutlined } from '@ant-design/icons';
++import { Link, useNavigate, useParams } from 'react-router-dom';
++import { getStudent, updateStudent } from '../../api/students';
++import { useAuth } from '../../auth/AuthContext';
++import { formatDate } from '../../utils/format';
++import useLeadLookups from '../leads/useLeadLookups';
++import DocumentChecklist from './DocumentChecklist';
++import EducationPanel from './EducationPanel';
++import StudentFormModal from './StudentFormModal';
++import TestScoresPanel from './TestScoresPanel';
++
++export default function StudentDetailPage() {
++  const { id } = useParams();
++  const navigate = useNavigate();
++  const { can } = useAuth();
++  const [messageApi, contextHolder] = message.useMessage();
++  const { countries, counselors } = useLeadLookups();
++
++  const [student, setStudent] = useState(null);
++  const [loading, setLoading] = useState(true);
++  const [error, setError] = useState(null);
++  const [editOpen, setEditOpen] = useState(false);
++  const [busy, setBusy] = useState(false);
++
++  const load = useCallback(async () => {
++    setError(null);
++    try {
++      setStudent(await getStudent(id));
++    } catch (err) {
++      setError(err);
++    } finally {
++      setLoading(false);
++    }
++  }, [id]);
++
++  useEffect(() => {
++    setLoading(true);
++    load();
++  }, [load]);
++
++  if (loading) {
++    return (
++      <div style={{ display: 'grid', placeItems: 'center', padding: 80 }}>
++        <Spin size="large" />
++      </div>
++    );
++  }
++
++  if (error?.status === 404) {
++    return (
++      <Result
++        status="404"
++        title="Student not found"
++        subTitle="The profile may not exist, or it isn't assigned to you."
++        extra={<Button onClick={() => navigate('/students')}>Back to students</Button>}
++      />
++    );
++  }
++
++  if (error) {
++    return (
++      <Alert
++        type="error"
++        showIcon
++        message={error.message}
++        action={
++          <Button size="small" onClick={load}>
++            Try again
++          </Button>
++        }
++      />
++    );
++  }
++
++  const canUpdate = can('students', 'update');
++
++  const reassign = async (assignedTo) => {
++    setBusy(true);
++    try {
++      await updateStudent(student.id, { assignedTo });
++      messageApi.success('Student reassigned');
++      await load();
++    } catch (err) {
++      messageApi.error(err.message);
++    } finally {
++      setBusy(false);
++    }
++  };
++
++  const details = [
++    { key: 'phone', label: 'Phone', children: student.phone ?? '-' },
++    { key: 'email', label: 'Email', children: student.email ?? '-' },
++    { key: 'dob', label: 'Date of birth', children: formatDate(student.dateOfBirth) },
++    { key: 'gender', label: 'Gender', children: student.gender ?? '-' },
++    { key: 'nationality', label: 'Nationality', children: student.nationality ?? '-' },
++    { key: 'address', label: 'Address', children: student.address ?? '-' },
++    { key: 'guardian', label: 'Guardian', children: student.guardianName ?? '-' },
++    { key: 'guardianPhone', label: 'Guardian phone', children: student.guardianPhone ?? '-' },
++    {
++      key: 'countries',
++      label: 'Preferred countries',
++      children: student.preferredCountries.length ? (
++        <Space size={[4, 4]} wrap>
++          {student.preferredCountries.map((c) => (
++            <Tag key={c.id}>{c.name}</Tag>
++          ))}
++        </Space>
++      ) : (
++        '-'
++      ),
++    },
++    { key: 'courses', label: 'Preferred courses', children: student.preferredCourses ?? '-' },
++    { key: 'counselor', label: 'Counselor', children: student.assignedTo?.fullName ?? 'Unassigned' },
++    { key: 'added', label: 'Student since', children: formatDate(student.createdAt) },
++    { key: 'notes', label: 'Notes', children: student.notes ?? '-' },
++  ];
++
++  const tabItems = [
++    {
++      key: 'overview',
++      label: 'Overview',
++      children: (
++        <Card
++          title="Personal details"
++          extra={
++            canUpdate && (
++              <Button size="small" icon={<EditOutlined />} onClick={() => setEditOpen(true)}>
++                Edit
++              </Button>
++            )
++          }
++        >
++          <Descriptions column={{ xs: 1, md: 2 }} size="small" items={details} />
++        </Card>
++      ),
++    },
++    {
++      key: 'academics',
++      label: 'Education and tests',
++      children: (
++        <Row gutter={[16, 16]}>
++          <Col xs={24} xl={14}>
++            <EducationPanel student={student} onChanged={load} />
++          </Col>
++          <Col xs={24} xl={10}>
++            <TestScoresPanel student={student} onChanged={load} />
++          </Col>
++        </Row>
++      ),
++    },
++    ...(can('documents', 'view')
++      ? [{ key: 'documents', label: 'Documents', children: <DocumentChecklist studentId={student.id} /> }]
++      : []),
++  ];
++
++  return (
++    <>
++      {contextHolder}
++      <Button type="link" icon={<ArrowLeftOutlined />} onClick={() => navigate('/students')} style={{ paddingLeft: 0 }}>
++        All students
++      </Button>
++
++      <Space style={{ width: '100%', justifyContent: 'space-between', margin: '4px 0 16px' }} align="start" wrap>
++        <Space align="center" size={12} wrap>
++          <Typography.Title level={3} style={{ margin: 0 }}>
++            {student.fullName}
++          </Typography.Title>
++          {can('leads', 'view') && student.leadId && <Link to={`/leads/${student.leadId}`}>View original lead</Link>}
++        </Space>
++
++        {canUpdate && (
++          <Select
++            style={{ width: 200 }}
++            value={student.assignedTo?.id}
++            disabled={busy}
++            placeholder="Unassigned"
++            suffixIcon={<UserSwitchOutlined />}
++            options={counselors.map((c) => ({ value: c.id, label: c.fullName }))}
++            onChange={reassign}
++          />
++        )}
++      </Space>
++
++      <Tabs items={tabItems} />
++
++      <StudentFormModal
++        open={editOpen}
++        student={student}
++        countries={countries}
++        onClose={() => setEditOpen(false)}
++        onSaved={() => {
++          setEditOpen(false);
++          messageApi.success('Student updated');
++          load();
++        }}
++      />
++    </>
++  );
++}
+diff --git a/src/pages/students/StudentFormModal.jsx b/src/pages/students/StudentFormModal.jsx
+new file mode 100644
+index 0000000..081ce46
+--- /dev/null
++++ b/src/pages/students/StudentFormModal.jsx
+@@ -0,0 +1,147 @@
++import { useState } from 'react';
++import { Alert, Col, DatePicker, Form, Input, Modal, Row, Select } from 'antd';
++import dayjs from 'dayjs';
++import { setPreferredCountries, updateStudent } from '../../api/students';
++import { GENDERS } from '../../config/studentOptions';
++
++// Edit a student's personal details and preferred countries.
++export default function StudentFormModal({ open, student, countries, onClose, onSaved }) {
++  const [form] = Form.useForm();
++  const [saving, setSaving] = useState(false);
++  const [error, setError] = useState(null);
++
++  const initialCountryIds = student.preferredCountries.map((c) => c.id);
++  const initialValues = {
++    fullName: student.fullName,
++    phone: student.phone ?? undefined,
++    email: student.email ?? undefined,
++    dateOfBirth: student.dateOfBirth ? dayjs(student.dateOfBirth) : undefined,
++    gender: student.gender ?? undefined,
++    nationality: student.nationality ?? undefined,
++    address: student.address ?? undefined,
++    guardianName: student.guardianName ?? undefined,
++    guardianPhone: student.guardianPhone ?? undefined,
++    preferredCountryIds: initialCountryIds,
++    preferredCourses: student.preferredCourses ?? undefined,
++    notes: student.notes ?? undefined,
++  };
++
++  const handleOk = async () => {
++    let values;
++    try {
++      values = await form.validateFields();
++    } catch {
++      return;
++    }
++    const orNull = (v) => (typeof v === 'string' ? v.trim() || null : v ?? null);
++    const payload = {
++      fullName: values.fullName.trim(),
++      phone: orNull(values.phone),
++      email: orNull(values.email),
++      dateOfBirth: values.dateOfBirth ? values.dateOfBirth.format('YYYY-MM-DD') : null,
++      gender: values.gender ?? null,
++      nationality: orNull(values.nationality),
++      address: orNull(values.address),
++      guardianName: orNull(values.guardianName),
++      guardianPhone: orNull(values.guardianPhone),
++      preferredCourses: orNull(values.preferredCourses),
++      notes: orNull(values.notes),
++    };
++
++    setSaving(true);
++    setError(null);
++    try {
++      await updateStudent(student.id, payload);
++      const ids = values.preferredCountryIds ?? [];
++      const changed = ids.length !== initialCountryIds.length || ids.some((id) => !initialCountryIds.includes(id));
++      if (changed) await setPreferredCountries(student.id, ids);
++      onSaved();
++    } catch (err) {
++      if (err.details?.length) {
++        form.setFields(err.details.map((d) => ({ name: d.field === 'countryIds' ? 'preferredCountryIds' : d.field, errors: [d.message] })));
++      }
++      setError(err.message);
++    } finally {
++      setSaving(false);
++    }
++  };
++
++  return (
++    <Modal
++      title="Edit student"
++      open={open}
++      onCancel={onClose}
++      onOk={handleOk}
++      okText="Save changes"
++      confirmLoading={saving}
++      width={680}
++      destroyOnClose
++      maskClosable={false}
++    >
++      {error && <Alert type="error" showIcon message={error} style={{ marginBottom: 16 }} />}
++      <Form form={form} layout="vertical" initialValues={initialValues} requiredMark={false}>
++        <Form.Item name="fullName" label="Full name" rules={[{ required: true, whitespace: true, message: "Enter the student's name." }]}>
++          <Input />
++        </Form.Item>
++        <Row gutter={16}>
++          <Col xs={24} sm={12}>
++            <Form.Item name="phone" label="Phone">
++              <Input />
++            </Form.Item>
++          </Col>
++          <Col xs={24} sm={12}>
++            <Form.Item name="email" label="Email" rules={[{ type: 'email', message: 'Enter a valid email address.' }]}>
++              <Input />
++            </Form.Item>
++          </Col>
++        </Row>
++        <Row gutter={16}>
++          <Col xs={24} sm={8}>
++            <Form.Item name="dateOfBirth" label="Date of birth">
++              <DatePicker style={{ width: '100%' }} format="D MMM YYYY" disabledDate={(d) => d.isAfter(dayjs())} />
++            </Form.Item>
++          </Col>
++          <Col xs={24} sm={8}>
++            <Form.Item name="gender" label="Gender">
++              <Select allowClear options={GENDERS} />
++            </Form.Item>
++          </Col>
++          <Col xs={24} sm={8}>
++            <Form.Item name="nationality" label="Nationality">
++              <Input />
++            </Form.Item>
++          </Col>
++        </Row>
++        <Form.Item name="address" label="Address">
++          <Input />
++        </Form.Item>
++        <Row gutter={16}>
++          <Col xs={24} sm={12}>
++            <Form.Item name="guardianName" label="Guardian name">
++              <Input />
++            </Form.Item>
++          </Col>
++          <Col xs={24} sm={12}>
++            <Form.Item name="guardianPhone" label="Guardian phone">
++              <Input />
++            </Form.Item>
++          </Col>
++        </Row>
++        <Form.Item name="preferredCountryIds" label="Preferred countries">
++          <Select
++            mode="multiple"
++            optionFilterProp="label"
++            placeholder="Select countries"
++            options={countries.map((c) => ({ value: c.id, label: c.name }))}
++          />
++        </Form.Item>
++        <Form.Item name="preferredCourses" label="Preferred courses">
++          <Input placeholder="For example: Nursing, Public Health" />
++        </Form.Item>
++        <Form.Item name="notes" label="Notes">
++          <Input.TextArea rows={3} />
++        </Form.Item>
++      </Form>
++    </Modal>
++  );
++}
+diff --git a/src/pages/students/StudentListPage.jsx b/src/pages/students/StudentListPage.jsx
+new file mode 100644
+index 0000000..8ea7850
+--- /dev/null
++++ b/src/pages/students/StudentListPage.jsx
+@@ -0,0 +1,170 @@
++import { useEffect, useState } from 'react';
++import { Alert, Button, Card, Input, Select, Space, Table, Tag, Typography } from 'antd';
++import { Link } from 'react-router-dom';
++import { listStudents } from '../../api/students';
++import { useAuth } from '../../auth/AuthContext';
++import { formatDate } from '../../utils/format';
++import useLeadLookups from '../leads/useLeadLookups';
++
++const DEFAULT_QUERY = { page: 1, limit: 20, sort: '-createdAt' };
++const FILTER_KEYS = ['q', 'assignedTo', 'preferredCountryId'];
++
++export default function StudentListPage() {
++  const { scopeOf, can } = useAuth();
++  const { countries, counselors } = useLeadLookups();
++
++  const [query, setQuery] = useState(DEFAULT_QUERY);
++  const [searchText, setSearchText] = useState('');
++  const [result, setResult] = useState({ data: [], meta: { total: 0 } });
++  const [loading, setLoading] = useState(true);
++  const [error, setError] = useState(null);
++
++  const seesAll = scopeOf('students', 'view') === 'all';
++  const hasFilters = FILTER_KEYS.some((k) => query[k]);
++
++  useEffect(() => {
++    let cancelled = false;
++    setLoading(true);
++    setError(null);
++    listStudents(query)
++      .then((res) => {
++        if (!cancelled) setResult(res);
++      })
++      .catch((err) => {
++        if (!cancelled) setError(err.message);
++      })
++      .finally(() => {
++        if (!cancelled) setLoading(false);
++      });
++    return () => {
++      cancelled = true;
++    };
++  }, [query]);
++
++  const setFilter = (patch) => setQuery((prev) => ({ ...prev, ...patch, page: 1 }));
++  const clearFilters = () => {
++    setSearchText('');
++    setQuery(DEFAULT_QUERY);
++  };
++  const sortOrder = (field) => (query.sort === field ? 'ascend' : query.sort === `-${field}` ? 'descend' : null);
++
++  const columns = [
++    {
++      title: 'Name',
++      dataIndex: 'fullName',
++      sorter: true,
++      sortOrder: sortOrder('fullName'),
++      render: (name, student) => (
++        <div>
++          <Link to={`/students/${student.id}`}>
++            <Typography.Text strong>{name}</Typography.Text>
++          </Link>
++          <div>
++            <Typography.Text type="secondary">{student.phone || student.email}</Typography.Text>
++          </div>
++        </div>
++      ),
++    },
++    {
++      title: 'Counselor',
++      render: (_, student) =>
++        student.assignedTo?.fullName ?? <Typography.Text type="secondary">Unassigned</Typography.Text>,
++    },
++    {
++      title: 'Preferred countries',
++      render: (_, student) =>
++        student.preferredCountries?.length ? (
++          <Space size={[4, 4]} wrap>
++            {student.preferredCountries.map((c) => (
++              <Tag key={c.id}>{c.name}</Tag>
++            ))}
++          </Space>
++        ) : (
++          '-'
++        ),
++    },
++    {
++      title: 'Added',
++      dataIndex: 'createdAt',
++      sorter: true,
++      sortOrder: sortOrder('createdAt'),
++      render: formatDate,
++    },
++  ];
++
++  const handleTableChange = (pagination, _filters, sorter) => {
++    const s = Array.isArray(sorter) ? sorter[0] : sorter;
++    const sort = s?.order ? (s.order === 'descend' ? `-${s.field}` : s.field) : DEFAULT_QUERY.sort;
++    setQuery((prev) => ({ ...prev, page: pagination.current, limit: pagination.pageSize, sort }));
++  };
++
++  return (
++    <>
++      <Typography.Title level={3} style={{ marginTop: 0 }}>
++        {seesAll ? 'Students' : 'My students'}
++      </Typography.Title>
++
++      <Card>
++        <Space wrap style={{ marginBottom: 16 }}>
++          <Input.Search
++            placeholder="Search name, phone or email"
++            allowClear
++            style={{ width: 260 }}
++            value={searchText}
++            onChange={(e) => {
++              setSearchText(e.target.value);
++              if (!e.target.value && query.q) setFilter({ q: undefined });
++            }}
++            onSearch={(value) => setFilter({ q: value.trim() || undefined })}
++          />
++          <Select
++            allowClear
++            showSearch
++            optionFilterProp="label"
++            placeholder="Preferred country"
++            style={{ width: 190 }}
++            value={query.preferredCountryId}
++            options={countries.map((c) => ({ value: c.id, label: c.name }))}
++            onChange={(value) => setFilter({ preferredCountryId: value })}
++          />
++          {seesAll && (
++            <Select
++              allowClear
++              placeholder="Counselor"
++              style={{ width: 170 }}
++              value={query.assignedTo}
++              options={counselors.map((c) => ({ value: c.id, label: c.fullName }))}
++              onChange={(value) => setFilter({ assignedTo: value })}
++            />
++          )}
++          {hasFilters && <Button onClick={clearFilters}>Clear filters</Button>}
++        </Space>
++
++        {error && <Alert type="error" showIcon message={error} style={{ marginBottom: 16 }} />}
++
++        <Table
++          rowKey="id"
++          columns={columns}
++          dataSource={result.data}
++          loading={loading}
++          scroll={{ x: 700 }}
++          onChange={handleTableChange}
++          pagination={{
++            current: query.page,
++            pageSize: query.limit,
++            total: result.meta.total,
++            showSizeChanger: true,
++            showTotal: (total) => `${total} students`,
++          }}
++          locale={{
++            emptyText: hasFilters
++              ? 'No students match these filters.'
++              : can('leads', 'update')
++                ? 'No students yet. Convert a lead to create one.'
++                : 'No students yet.',
++          }}
++        />
++      </Card>
++    </>
++  );
++}
+diff --git a/src/pages/students/StudentsPage.jsx b/src/pages/students/StudentsPage.jsx
+new file mode 100644
+index 0000000..6827f7d
+--- /dev/null
++++ b/src/pages/students/StudentsPage.jsx
+@@ -0,0 +1,15 @@
++import { Route, Routes } from 'react-router-dom';
++import NotFoundPage from '../NotFoundPage';
++import StudentDetailPage from './StudentDetailPage';
++import StudentListPage from './StudentListPage';
++
++// Mounted at /students/* so it can own its sub-routes.
++export default function StudentsPage() {
++  return (
++    <Routes>
++      <Route index element={<StudentListPage />} />
++      <Route path=":id" element={<StudentDetailPage />} />
++      <Route path="*" element={<NotFoundPage />} />
++    </Routes>
++  );
++}
+diff --git a/src/pages/students/TestScoresPanel.jsx b/src/pages/students/TestScoresPanel.jsx
+new file mode 100644
+index 0000000..3fb537e
+--- /dev/null
++++ b/src/pages/students/TestScoresPanel.jsx
+@@ -0,0 +1,200 @@
++import { useState } from 'react';
++import { Alert, Button, Card, Col, DatePicker, Form, InputNumber, Modal, Popconfirm, Row, Select, Space, Table, message } from 'antd';
++import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
++import dayjs from 'dayjs';
++import { addTestScore, deleteTestScore, updateTestScore } from '../../api/students';
++import { useAuth } from '../../auth/AuthContext';
++import { SECTIONS, SECTION_RANGES, SECTION_TESTS, TEST_NAMES, TEST_RANGES } from '../../config/studentOptions';
++import { formatDate } from '../../utils/format';
++
++function TestScoreModal({ open, studentId, record, onClose, onSaved }) {
++  const [form] = Form.useForm();
++  const [saving, setSaving] = useState(false);
++  const [error, setError] = useState(null);
++  const isEdit = Boolean(record);
++  const testName = Form.useWatch('testName', form) ?? record?.testName;
++  const overall = TEST_RANGES[testName];
++  const hasSections = SECTION_TESTS.includes(testName);
++  const sectionRange = SECTION_RANGES[testName];
++
++  const initialValues = record
++    ? {
++        testName: record.testName,
++        overallScore: record.overallScore ?? undefined,
++        testDate: record.testDate ? dayjs(record.testDate) : undefined,
++        ...Object.fromEntries(SECTIONS.map((s) => [`section_${s.key}`, record.sectionScores?.[s.key] ?? undefined])),
++      }
++    : { testName: 'IELTS' };
++
++  const handleOk = async () => {
++    let values;
++    try {
++      values = await form.validateFields();
++    } catch {
++      return;
++    }
++    const sectionScores = hasSections
++      ? Object.fromEntries(SECTIONS.map((s) => [s.key, values[`section_${s.key}`]]).filter(([, v]) => v != null))
++      : null;
++    const payload = {
++      testName: values.testName,
++      overallScore: values.overallScore ?? null,
++      sectionScores: sectionScores && Object.keys(sectionScores).length ? sectionScores : null,
++      testDate: values.testDate ? values.testDate.format('YYYY-MM-DD') : null,
++    };
++    setSaving(true);
++    setError(null);
++    try {
++      if (isEdit) await updateTestScore(studentId, record.id, payload);
++      else await addTestScore(studentId, payload);
++      onSaved();
++    } catch (err) {
++      if (err.details?.length) form.setFields(err.details.map((d) => ({ name: d.field, errors: [d.message] })));
++      setError(err.message);
++    } finally {
++      setSaving(false);
++    }
++  };
++
++  return (
++    <Modal
++      title={isEdit ? 'Edit test score' : 'Add test score'}
++      open={open}
++      onCancel={onClose}
++      onOk={handleOk}
++      okText={isEdit ? 'Save changes' : 'Add'}
++      confirmLoading={saving}
++      destroyOnClose
++      maskClosable={false}
++    >
++      {error && <Alert type="error" showIcon message={error} style={{ marginBottom: 16 }} />}
++      <Form form={form} layout="vertical" initialValues={initialValues} requiredMark={false}>
++        <Row gutter={16}>
++          <Col span={12}>
++            <Form.Item name="testName" label="Test" rules={[{ required: true, message: 'Choose a test.' }]}>
++              <Select options={TEST_NAMES} />
++            </Form.Item>
++          </Col>
++          <Col span={12}>
++            <Form.Item name="overallScore" label="Overall score">
++              <InputNumber {...overall} style={{ width: '100%' }} />
++            </Form.Item>
++          </Col>
++        </Row>
++        {hasSections && (
++          <Row gutter={12}>
++            {SECTIONS.map((s) => (
++              <Col span={6} key={s.key}>
++                <Form.Item name={`section_${s.key}`} label={s.label}>
++                  <InputNumber {...sectionRange} style={{ width: '100%' }} />
++                </Form.Item>
++              </Col>
++            ))}
++          </Row>
++        )}
++        <Form.Item name="testDate" label="Test date">
++          <DatePicker style={{ width: '100%' }} format="D MMM YYYY" />
++        </Form.Item>
++      </Form>
++    </Modal>
++  );
++}
++
++const formatSections = (scores) =>
++  scores
++    ? SECTIONS.filter((s) => scores[s.key] != null)
++        .map((s) => `${s.short} ${scores[s.key]}`)
++        .join(' · ')
++    : '-';
++
++// Test scores for a student. `onChanged` should reload the student.
++export default function TestScoresPanel({ student, onChanged }) {
++  const { can } = useAuth();
++  const [messageApi, contextHolder] = message.useMessage();
++  const [modalOpen, setModalOpen] = useState(false);
++  const [editing, setEditing] = useState(null);
++  const canUpdate = can('students', 'update');
++
++  const remove = async (record) => {
++    try {
++      await deleteTestScore(student.id, record.id);
++      messageApi.success('Removed');
++      onChanged();
++    } catch (err) {
++      messageApi.error(err.message);
++    }
++  };
++
++  const columns = [
++    { title: 'Test', dataIndex: 'testName' },
++    { title: 'Overall', dataIndex: 'overallScore', render: (v) => v ?? '-' },
++    { title: 'Sections', dataIndex: 'sectionScores', render: formatSections },
++    { title: 'Date', dataIndex: 'testDate', render: formatDate },
++    ...(canUpdate
++      ? [
++          {
++            title: '',
++            width: 90,
++            render: (_, record) => (
++              <Space size={4}>
++                <Button
++                  type="text"
++                  icon={<EditOutlined />}
++                  aria-label="Edit test score"
++                  onClick={() => {
++                    setEditing(record);
++                    setModalOpen(true);
++                  }}
++                />
++                <Popconfirm title="Remove this score?" okText="Remove" okButtonProps={{ danger: true }} onConfirm={() => remove(record)}>
++                  <Button type="text" danger icon={<DeleteOutlined />} aria-label="Remove test score" />
++                </Popconfirm>
++              </Space>
++            ),
++          },
++        ]
++      : []),
++  ];
++
++  return (
++    <Card
++      title="Test scores"
++      extra={
++        canUpdate && (
++          <Button
++            size="small"
++            icon={<PlusOutlined />}
++            onClick={() => {
++              setEditing(null);
++              setModalOpen(true);
++            }}
++          >
++            Add
++          </Button>
++        )
++      }
++    >
++      {contextHolder}
++      <Table
++        rowKey="id"
++        size="small"
++        columns={columns}
++        dataSource={student.testScores}
++        pagination={false}
++        scroll={{ x: 520 }}
++        locale={{ emptyText: 'No test scores yet.' }}
++      />
++      <TestScoreModal
++        open={modalOpen}
++        studentId={student.id}
++        record={editing}
++        onClose={() => setModalOpen(false)}
++        onSaved={() => {
++          setModalOpen(false);
++          messageApi.success(editing ? 'Test score updated' : 'Test score added');
++          onChanged();
++        }}
++      />
++    </Card>
++  );
++}
+diff --git a/src/utils/files.js b/src/utils/files.js
+new file mode 100644
+index 0000000..9180b8a
+--- /dev/null
++++ b/src/utils/files.js
+@@ -0,0 +1,20 @@
++import { ALLOWED_UPLOAD_EXTENSIONS, MAX_UPLOAD_MB } from '../config/studentOptions';
++
++export function formatFileSize(bytes) {
++  if (bytes == null) return '';
++  if (bytes < 1024) return `${bytes} B`;
++  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
++  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
++}
++
++// Returns an error message, or null when the file is fine. Mirrors the server limits.
++export function validateUpload(file) {
++  const extension = file.name.split('.').pop()?.toLowerCase();
++  if (!ALLOWED_UPLOAD_EXTENSIONS.includes(extension)) {
++    return 'Only PDF, JPG, PNG and DOCX files are allowed.';
++  }
++  if (file.size > MAX_UPLOAD_MB * 1024 * 1024) {
++    return `Files must be ${MAX_UPLOAD_MB} MB or smaller.`;
++  }
++  return null;
++}

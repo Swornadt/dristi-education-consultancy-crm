@@ -53,3 +53,9 @@ export async function mockMe() {
   if (!user) throw new ApiError(401, 'UNAUTHENTICATED', 'Session expired. Please sign in again.');
   return user;
 }
+
+// Used by other mock modules to know who is "calling the API".
+export function getMockCurrentUser() {
+  const role = (getToken() || '').replace('mock-token-', '');
+  return USERS[role] ?? null;
+}

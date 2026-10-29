@@ -270,3 +270,6 @@ export async function addActivity(id, { type, content } = {}) {
   const { leadId, ...rest } = row;
   return copy(rest);
 }
+
+// Lets other mock modules (tasks) look up a lead.
+export const findMockLead = (id) => leads.find((l) => l.id === Number(id));

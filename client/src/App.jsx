@@ -10,6 +10,7 @@ import LeadsPage from './pages/leads/LeadsPage';
 import LoginPage from './pages/LoginPage';
 import ModulePlaceholder from './pages/ModulePlaceholder';
 import NotFoundPage from './pages/NotFoundPage';
+import TasksPage from './pages/tasks/TasksPage';
 import { theme } from './theme';
 
 // Replace a placeholder by adding the real page here, keyed by the NAV_ITEMS key.
@@ -17,6 +18,7 @@ import { theme } from './theme';
 const PAGES = {
   dashboard: <DashboardPage />,
   leads: <LeadsPage />,
+  tasks: <TasksPage />,
 };
 
 // "/" sends each role to the first module it can view (front desk has no dashboard, for example).

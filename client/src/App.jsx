@@ -10,6 +10,7 @@ import LeadsPage from './pages/leads/LeadsPage';
 import LoginPage from './pages/LoginPage';
 import ModulePlaceholder from './pages/ModulePlaceholder';
 import NotFoundPage from './pages/NotFoundPage';
+import StudentsPage from './pages/students/StudentsPage';
 import TasksPage from './pages/tasks/TasksPage';
 import { theme } from './theme';
 
@@ -19,6 +20,7 @@ const PAGES = {
   dashboard: <DashboardPage />,
   leads: <LeadsPage />,
   tasks: <TasksPage />,
+  students: <StudentsPage />,
 };
 
 // "/" sends each role to the first module it can view (front desk has no dashboard, for example).

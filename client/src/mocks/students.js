@@ -321,3 +321,9 @@ export async function deleteChecklistItem(id, itemId) {
   const item = findItem(student, itemId);
   checklists.set(student.id, checklists.get(student.id).filter((i) => i !== item));
 }
+
+// Used by the applications mock to look up students (and their scope).
+export function getMockStudents() {
+  sync();
+  return students;
+}

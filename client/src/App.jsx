@@ -4,12 +4,15 @@ import { AuthProvider, useAuth } from './auth/AuthContext';
 import ProtectedRoute from './auth/ProtectedRoute';
 import { NAV_ITEMS } from './config/modules';
 import AppLayout from './layouts/AppLayout';
+import ApplicationsPage from './pages/applications/ApplicationsPage';
+import CatalogPage from './pages/catalog/CatalogPage';
 import DashboardPage from './pages/DashboardPage';
 import ForbiddenPage from './pages/ForbiddenPage';
 import LeadsPage from './pages/leads/LeadsPage';
 import LoginPage from './pages/LoginPage';
 import ModulePlaceholder from './pages/ModulePlaceholder';
 import NotFoundPage from './pages/NotFoundPage';
+import StudentsPage from './pages/students/StudentsPage';
 import TasksPage from './pages/tasks/TasksPage';
 import { theme } from './theme';
 
@@ -19,6 +22,9 @@ const PAGES = {
   dashboard: <DashboardPage />,
   leads: <LeadsPage />,
   tasks: <TasksPage />,
+  students: <StudentsPage />,
+  applications: <ApplicationsPage />,
+  catalog: <CatalogPage />,
 };
 
 // "/" sends each role to the first module it can view (front desk has no dashboard, for example).

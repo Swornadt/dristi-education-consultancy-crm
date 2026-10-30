@@ -8,6 +8,7 @@ import { formatDate } from '../../utils/format';
 import useLeadLookups from '../leads/useLeadLookups';
 import DocumentChecklist from './DocumentChecklist';
 import EducationPanel from './EducationPanel';
+import StudentApplications from './StudentApplications';
 import StudentFormModal from './StudentFormModal';
 import TestScoresPanel from './TestScoresPanel';
 
@@ -152,6 +153,9 @@ export default function StudentDetailPage() {
     },
     ...(can('documents', 'view')
       ? [{ key: 'documents', label: 'Documents', children: <DocumentChecklist studentId={student.id} /> }]
+      : []),
+    ...(can('applications', 'view')
+      ? [{ key: 'applications', label: 'Applications', children: <StudentApplications student={student} /> }]
       : []),
   ];
 

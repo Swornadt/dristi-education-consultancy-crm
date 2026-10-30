@@ -1,7 +1,7 @@
 import { Empty, Typography, theme } from 'antd';
 
 // A simple horizontal bar list: items = [{ key, label, value }]. No chart library needed.
-export default function BarList({ items, emptyText = 'Nothing to show yet.' }) {
+export default function BarList({ items, emptyText = 'Nothing to show yet.', formatValue }) {
   const { token } = theme.useToken();
   if (!items.length) return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={emptyText} />;
 
@@ -12,7 +12,7 @@ export default function BarList({ items, emptyText = 'Nothing to show yet.' }) {
         <div key={item.key}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
             <span>{item.label}</span>
-            <Typography.Text strong>{item.value}</Typography.Text>
+            <Typography.Text strong>{formatValue ? formatValue(item.value) : item.value}</Typography.Text>
           </div>
           <div style={{ height: 8, borderRadius: 4, background: token.colorFillSecondary }}>
             <div

@@ -3,6 +3,7 @@ import { Alert, Button, Card, Col, DatePicker, Row, Space, Spin, Statistic, Tabl
 import { ReloadOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { Link } from 'react-router-dom';
+import { getAccountsSummary } from '../api/accounts';
 import { getDashboardSummary } from '../api/dashboard';
 import { useAuth } from '../auth/AuthContext';
 import ApplicationStatusTag from '../components/ApplicationStatusTag';
@@ -10,6 +11,7 @@ import BarList from '../components/BarList';
 import LeadStatusTag from '../components/LeadStatusTag';
 import { LEAD_SOURCES, labelOf } from '../config/leadOptions';
 import { formatDate } from '../utils/format';
+import { formatMoney } from '../utils/money';
 
 function DaysLeft({ deadline }) {
   const days = dayjs(deadline).startOf('day').diff(dayjs().startOf('day'), 'day');
@@ -18,13 +20,14 @@ function DaysLeft({ deadline }) {
 }
 
 export default function DashboardPage() {
-  const { user, scopeOf } = useAuth();
+  const { user, scopeOf, can } = useAuth();
   const { token } = theme.useToken();
   const [month, setMonth] = useState(dayjs().startOf('month'));
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [accounts, setAccounts] = useState(null);
 
   const seesAll = scopeOf('dashboard', 'view') === 'all';
 
@@ -46,6 +49,23 @@ export default function DashboardPage() {
       cancelled = true;
     };
   }, [month, refreshKey]);
+
+  // Office accounts figures, only for roles that can open the Accounts page.
+  const canSeeAccounts = can('accounts', 'view');
+  useEffect(() => {
+    if (!canSeeAccounts) return undefined;
+    let cancelled = false;
+    getAccountsSummary(month.format('YYYY-MM'))
+      .then((res) => {
+        if (!cancelled) setAccounts(res);
+      })
+      .catch(() => {
+        if (!cancelled) setAccounts(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [canSeeAccounts, month, refreshKey]);
 
   const header = (
     <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }} align="start" wrap>
@@ -145,6 +165,28 @@ export default function DashboardPage() {
               </Link>
             </Col>
           ))}
+
+          {accounts && (
+            <Col span={24}>
+              <Card title={`Office accounts, ${monthLabel}`} extra={<Link to="/accounts">Open accounts</Link>}>
+                <Row gutter={16}>
+                  <Col xs={24} sm={8}>
+                    <Statistic title="Income" value={formatMoney(accounts.totalIncome)} />
+                  </Col>
+                  <Col xs={24} sm={8}>
+                    <Statistic title="Expenses" value={formatMoney(accounts.totalExpense)} />
+                  </Col>
+                  <Col xs={24} sm={8}>
+                    <Statistic
+                      title="Net"
+                      value={formatMoney(accounts.net)}
+                      valueStyle={{ color: accounts.net < 0 ? token.colorError : token.colorSuccess }}
+                    />
+                  </Col>
+                </Row>
+              </Card>
+            </Col>
+          )}
 
           <Col xs={24} lg={8}>
             <Card title="Leads by status">

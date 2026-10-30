@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './auth/AuthContext';
 import ProtectedRoute from './auth/ProtectedRoute';
 import { NAV_ITEMS } from './config/modules';
 import AppLayout from './layouts/AppLayout';
+import AccountsPage from './pages/accounts/AccountsPage';
 import ApplicationsPage from './pages/applications/ApplicationsPage';
 import CatalogPage from './pages/catalog/CatalogPage';
 import DashboardPage from './pages/DashboardPage';
@@ -25,6 +26,7 @@ const PAGES = {
   students: <StudentsPage />,
   applications: <ApplicationsPage />,
   catalog: <CatalogPage />,
+  accounts: <AccountsPage />,
 };
 
 // "/" sends each role to the first module it can view (front desk has no dashboard, for example).

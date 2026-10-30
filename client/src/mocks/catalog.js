@@ -5,6 +5,12 @@ import { getMockCurrentUser } from './auth';
 import { COUNTRIES } from './data';
 
 const delay = (ms = 150) => new Promise((resolve) => setTimeout(resolve, ms));
+// Local date as YYYY-MM-DD, n days from today. Keeps seeded deadlines realistic whenever the demo is run.
+const daysFromNow = (n) => {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
 const copy = (value) => JSON.parse(JSON.stringify(value));
 const validation = (details) => new ApiError(400, 'VALIDATION_ERROR', 'Invalid request', details);
 const conflict = (message) => new ApiError(409, 'CONFLICT', message);
@@ -46,7 +52,7 @@ UNIS.forEach(([countryId, name, city], ui) => {
     programs.push(program);
     intakes.push({
       id: intakes.length + 1, programId: program.id, term: 'spring', year: 2027, isActive: true,
-      applicationDeadline: `2026-12-${String(5 + ((program.id * 3) % 20)).padStart(2, '0')}`,
+      applicationDeadline: daysFromNow(7 + ((program.id * 3) % 21)),
     });
     intakes.push({
       id: intakes.length + 1, programId: program.id, term: 'fall', year: 2027, isActive: true,

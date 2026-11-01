@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Alert, Button, Card, Input, Select, Space, Switch, Table, Tabs, Tag, Typography, message } from 'antd';
-import { EditOutlined, KeyOutlined, PlusOutlined } from '@ant-design/icons';
+import { EditOutlined, KeyOutlined, PlusOutlined, SafetyOutlined } from '@ant-design/icons';
 import { listRoles, listUsers, updateUser } from '../../api/users';
 import { useAuth } from '../../auth/AuthContext';
 import { ROLE_LABELS } from '../../theme';
 import { formatDate, formatDateTime } from '../../utils/format';
-import PermissionMatrix from './PermissionMatrix';
 import ResetPasswordModal from './ResetPasswordModal';
+import RolePermissionsEditor from './RolePermissionsEditor';
 import UserFormModal from './UserFormModal';
+import UserPermissionsDrawer from './UserPermissionsDrawer';
 
 const DEFAULT_QUERY = { page: 1, limit: 20 };
 
@@ -23,6 +24,7 @@ function UsersTab() {
   const [error, setError] = useState(null);
   const [form, setForm] = useState({ open: false, record: null });
   const [reset, setReset] = useState({ open: false, record: null });
+  const [perms, setPerms] = useState({ open: false, record: null });
 
   const hasFilters = Boolean(query.q || query.role || query.isActive !== undefined);
   const reload = () => setRefreshKey((k) => k + 1);
@@ -86,7 +88,22 @@ function UsersTab() {
         </div>
       ),
     },
-    { title: 'Role', dataIndex: 'role', render: (r) => <Tag color="blue">{ROLE_LABELS[r] ?? r}</Tag> },
+    {
+      title: 'Role',
+      dataIndex: 'role',
+      render: (r, u) => (
+        <Space size={4} wrap>
+          <Tag color="blue" style={{ margin: 0 }}>
+            {ROLE_LABELS[r] ?? r}
+          </Tag>
+          {u.hasOverrides && (
+            <Tag color="gold" style={{ margin: 0 }}>
+              Custom permissions
+            </Tag>
+          )}
+        </Space>
+      ),
+    },
     {
       title: 'Active',
       width: 90,
@@ -96,11 +113,14 @@ function UsersTab() {
     { title: 'Added', dataIndex: 'createdAt', render: formatDate },
     {
       title: '',
-      width: 96,
+      width: 136,
       render: (_, u) => (
         <Space size={4}>
           <Button type="text" icon={<EditOutlined />} aria-label="Edit user" onClick={() => setForm({ open: true, record: u })} />
           <Button type="text" icon={<KeyOutlined />} aria-label="Reset password" onClick={() => setReset({ open: true, record: u })} />
+          {me.role === 'admin' && (
+            <Button type="text" icon={<SafetyOutlined />} aria-label="Edit permissions" onClick={() => setPerms({ open: true, record: u })} />
+          )}
         </Space>
       ),
     },
@@ -187,6 +207,16 @@ function UsersTab() {
           reload();
         }}
       />
+      <UserPermissionsDrawer
+        open={perms.open}
+        user={perms.record}
+        onClose={() => setPerms({ open: false, record: null })}
+        onSaved={() => {
+          setPerms({ open: false, record: null });
+          messageApi.success('Permissions saved');
+          reload();
+        }}
+      />
       <ResetPasswordModal
         open={reset.open}
         record={reset.record}
@@ -210,7 +240,7 @@ export default function UsersPage() {
         <Tabs
           items={[
             { key: 'users', label: 'Users', children: <UsersTab /> },
-            { key: 'roles', label: 'Roles and permissions', children: <PermissionMatrix /> },
+            { key: 'roles', label: 'Roles and permissions', children: <RolePermissionsEditor /> },
           ]}
         />
       </Card>

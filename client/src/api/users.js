@@ -20,3 +20,18 @@ export const updateUser = (id, payload) =>
 
 // GET /roles -> [{ id, name, description, permissions: [{ module, action, scope }] }]
 export const listRoles = () => (USE_MOCK ? mock.listRoles() : api.get('/roles').then((r) => unwrapList(r.data)));
+
+// PUT /roles/:id/permissions { permissions: [{ module, action, scope }] } replaces the role's matrix.
+// The admin role can't be edited (409). Returns the updated role.
+export const updateRolePermissions = (roleId, permissions) =>
+  USE_MOCK ? mock.updateRolePermissions(roleId, permissions) : body(api.put(`/roles/${roleId}/permissions`, { permissions }));
+
+// GET /users/:id/permissions -> { role: { id, name }, base, overrides, effective }
+//   base      = the role's permissions
+//   overrides = [{ module, action, effect: 'grant' | 'deny', scope? }]  (scope required for grant)
+//   effective = base with overrides applied
+export const getUserPermissions = (id) => (USE_MOCK ? mock.getUserPermissions(id) : body(api.get(`/users/${id}/permissions`)));
+
+// PUT /users/:id/permissions { overrides } replaces all of the person's overrides. Send [] to reset to the role.
+export const setUserPermissions = (id, overrides) =>
+  USE_MOCK ? mock.setUserPermissions(id, overrides) : body(api.put(`/users/${id}/permissions`, { overrides }));

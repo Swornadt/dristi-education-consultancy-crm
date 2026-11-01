@@ -2,8 +2,12 @@
 // Passwords and deactivation are connected to the mock login, so resetting a password or
 // deactivating one of the three demo accounts really changes whether it can sign in.
 import { ApiError } from '../api/ApiError';
+import { PERMISSION_MODULES } from '../config/permissionModules';
+import { computeEffective } from '../utils/permissions';
 import { MIN_PASSWORD_LENGTH } from '../utils/password';
-import { ROLE_PERMISSIONS, getMockCurrentUser, setMockPassword, setMockUserActive } from './auth';
+import {
+  ROLE_PERMISSIONS, getMockCurrentUser, getMockOverrides, setMockOverrides, setMockPassword, setMockRolePermissions, setMockUserActive,
+} from './auth';
 import { USER_NAMES } from './data';
 
 const delay = (ms = 200) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -31,7 +35,7 @@ const users = [
 let nextUserId = 7;
 
 const roleOf = (id) => ROLES.find((r) => r.id === Number(id));
-const serialize = ({ roleId, ...rest }) => copy({ ...rest, role: roleOf(roleId).name });
+const serialize = ({ roleId, ...rest }) => copy({ ...rest, role: roleOf(roleId).name, hasOverrides: getMockOverrides(rest.id).length > 0 });
 
 function adminOnly(action) {
   const me = getMockCurrentUser();
@@ -131,4 +135,82 @@ export function getAssignableUsers() {
     .filter((u) => u.isActive && roleOf(u.roleId).name === 'counselor')
     .sort((a, b) => a.fullName.localeCompare(b.fullName))
     .map((u) => ({ id: u.id, fullName: u.fullName }));
+}
+
+// ---------- granular permissions ----------
+// Only people whose role is admin may edit roles or overrides. This is deliberately not a normal permission:
+// otherwise someone granted "users: edit" could give themselves anything.
+function adminRoleOnly() {
+  const me = getMockCurrentUser();
+  if (!me) throw new ApiError(401, 'UNAUTHENTICATED', 'Session expired. Please sign in again.');
+  if (me.role !== 'admin') throw new ApiError(403, 'FORBIDDEN', "You don't have permission to do that.");
+  return me;
+}
+
+const MODULES = new Map(PERMISSION_MODULES.map((m) => [m.key, m]));
+const bad = (message) => new ApiError(400, 'VALIDATION_ERROR', 'Invalid request', [{ field: 'permissions', message }]);
+
+function checkEntry(entry, { override }) {
+  const module = MODULES.get(entry.module);
+  if (!module || !module.actions.includes(entry.action)) throw bad(`Unknown permission ${entry.module}:${entry.action}.`);
+  if (override && !['grant', 'deny'].includes(entry.effect)) throw bad('Each override must be a grant or a deny.');
+  if (!override || entry.effect === 'grant') {
+    if (!['own', 'all'].includes(entry.scope)) throw bad(`Choose own or all for ${entry.module}:${entry.action}.`);
+    if (!module.scoped && entry.scope !== 'all') throw bad(`${module.label} can only be granted for all.`);
+  }
+}
+
+export async function updateRolePermissions(roleId, permissions) {
+  await delay();
+  adminRoleOnly();
+  const role = roleOf(roleId);
+  if (!role) throw new ApiError(404, 'NOT_FOUND', 'Role not found.');
+  if (role.name === 'admin') throw new ApiError(409, 'CONFLICT', 'The admin role always has full access and cannot be edited.');
+  if (!Array.isArray(permissions)) throw bad('Send the full list of permissions.');
+  const seen = new Set();
+  permissions.forEach((p) => {
+    checkEntry(p, { override: false });
+    const key = `${p.module}:${p.action}`;
+    if (seen.has(key)) throw bad(`${key} is listed twice.`);
+    seen.add(key);
+  });
+  permissions.forEach((p) => {
+    if (p.action !== 'view' && !seen.has(`${p.module}:view`)) throw bad(`${p.module}:${p.action} also needs ${p.module}:view.`);
+  });
+  setMockRolePermissions(role.name, permissions.map(({ module, action, scope }) => ({ module, action, scope })));
+  return copy({ ...role, permissions: ROLE_PERMISSIONS[role.name] });
+}
+
+function userPermissionsView(user) {
+  const role = roleOf(user.roleId);
+  const base = ROLE_PERMISSIONS[role.name] ?? [];
+  const overrides = getMockOverrides(user.id);
+  return copy({ role: { id: role.id, name: role.name }, base, overrides, effective: computeEffective(base, overrides) });
+}
+
+export async function getUserPermissions(id) {
+  await delay();
+  adminRoleOnly();
+  const user = users.find((u) => u.id === Number(id));
+  if (!user) throw new ApiError(404, 'NOT_FOUND', 'User not found.');
+  return userPermissionsView(user);
+}
+
+export async function setUserPermissions(id, overrides) {
+  await delay();
+  const me = adminRoleOnly();
+  const user = users.find((u) => u.id === Number(id));
+  if (!user) throw new ApiError(404, 'NOT_FOUND', 'User not found.');
+  if (roleOf(user.roleId).name === 'admin') throw new ApiError(409, 'CONFLICT', 'Admins already have full access; their permissions cannot be customized.');
+  if (user.id === me.id) throw new ApiError(409, 'CONFLICT', "You can't change your own permissions.");
+  if (!Array.isArray(overrides)) throw bad('Send the full list of overrides.');
+  const seen = new Set();
+  overrides.forEach((o) => {
+    checkEntry(o, { override: true });
+    const key = `${o.module}:${o.action}`;
+    if (seen.has(key)) throw bad(`${key} is listed twice.`);
+    seen.add(key);
+  });
+  setMockOverrides(user.id, overrides.map((o) => (o.effect === 'deny' ? { module: o.module, action: o.action, effect: 'deny' } : { module: o.module, action: o.action, effect: 'grant', scope: o.scope })));
+  return userPermissionsView(user);
 }

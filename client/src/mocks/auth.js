@@ -2,6 +2,7 @@
 // The permissions mirror the seed data in schema.sql.
 import { ApiError } from '../api/ApiError';
 import { getToken } from '../api/token';
+import { computeEffective } from '../utils/permissions';
 
 const delay = (ms = 250) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -48,6 +49,19 @@ export const ROLE_PERMISSIONS = {
   counselor: counselorPermissions,
   front_desk: frontDeskPermissions,
 };
+
+// Per-user overrides (grant or deny on top of the role), kept in memory.
+const OVERRIDES = new Map();
+export const getMockOverrides = (userId) => OVERRIDES.get(userId) ?? [];
+export const setMockOverrides = (userId, overrides) => (overrides.length ? OVERRIDES.set(userId, overrides) : OVERRIDES.delete(userId));
+
+// Replace a role's permissions in place (the arrays are shared, so every user of the role sees the change).
+export const setMockRolePermissions = (roleName, permissions) => {
+  ROLE_PERMISSIONS[roleName].splice(0, ROLE_PERMISSIONS[roleName].length, ...permissions);
+};
+
+// The permissions a signed-in person actually has: role base plus their overrides.
+const withEffective = (user) => ({ ...user, permissions: computeEffective(ROLE_PERMISSIONS[user.role], getMockOverrides(user.id)) });
 export const MOCK_ACCOUNTS = Object.values(USERS).map(({ email, role, fullName }) => ({ email, role, fullName }));
 
 export async function mockLogin(email, password) {
@@ -59,7 +73,7 @@ export async function mockLogin(email, password) {
   if (INACTIVE.has(user.id)) {
     throw new ApiError(401, 'UNAUTHENTICATED', 'Your account is deactivated. Ask an admin for help.');
   }
-  return { token: `mock-token-${user.role}`, user };
+  return { token: `mock-token-${user.role}`, user: withEffective(user) };
 }
 
 export async function mockMe() {
@@ -67,13 +81,13 @@ export async function mockMe() {
   const role = (getToken() || '').replace('mock-token-', '');
   const user = USERS[role];
   if (!user) throw new ApiError(401, 'UNAUTHENTICATED', 'Session expired. Please sign in again.');
-  return user;
+  return withEffective(user);
 }
 
 // Used by other mock modules to know who is "calling the API".
 export function getMockCurrentUser() {
   const role = (getToken() || '').replace('mock-token-', '');
-  return USERS[role] ?? null;
+  return USERS[role] ? withEffective(USERS[role]) : null;
 }
 
 // POST /auth/change-password

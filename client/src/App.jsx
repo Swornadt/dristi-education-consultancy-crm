@@ -17,6 +17,7 @@ import UsersPage from './pages/users/UsersPage';
 import StudentsPage from './pages/students/StudentsPage';
 import TasksPage from './pages/tasks/TasksPage';
 import { theme } from './theme';
+import LandingPage from './pages/landing/LandingPage';
 
 // Replace a placeholder by adding the real page here, keyed by the NAV_ITEMS key.
 // Pages that need sub-routes (e.g. /leads/12) can render their own <Routes> inside.
@@ -29,6 +30,7 @@ const PAGES = {
   catalog: <CatalogPage />,
   accounts: <AccountsPage />,
   users: <UsersPage />,
+  landing: <LandingPage />
 };
 
 // "/" sends each role to the first module it can view (front desk has no dashboard, for example).
@@ -44,6 +46,7 @@ export default function App() {
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/welcome" element={<LandingPage />} />
           <Route
             path="/"
             element={

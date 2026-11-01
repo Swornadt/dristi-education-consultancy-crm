@@ -28,9 +28,9 @@ const PATHS = {
 // [studentId, intakeId, status]. Student ids 106, 113, 120, 127 are the seeded converted leads.
 const SEEDS = [
   [106, 1, 'draft'], [106, 9, 'submitted'], [106, 20, 'offer'],
-  [113, 4, 'submitted'], [113, 15, 'accepted'],
-  [120, 30, 'draft'], [120, 33, 'rejected'], [120, 40, 'submitted'],
-  [127, 50, 'draft'],
+  [113, 5, 'submitted'], [113, 15, 'accepted'],
+  [120, 31, 'draft'], [120, 33, 'rejected'], [120, 40, 'submitted'],
+  [127, 49, 'draft'],
 ];
 
 let nextApplicationId = 1;

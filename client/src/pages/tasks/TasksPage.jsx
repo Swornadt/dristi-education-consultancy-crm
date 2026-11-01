@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Alert, Button, Card, Checkbox, Popconfirm, Select, Space, Table, Tabs, Typography, message } from 'antd';
 import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { completeTask, deleteTask, listTasks } from '../../api/tasks';
 import { useAuth } from '../../auth/AuthContext';
 import Can from '../../components/Can';
@@ -23,7 +23,9 @@ export default function TasksPage() {
   const [messageApi, contextHolder] = message.useMessage();
   const { counselors } = useLeadLookups();
 
-  const [query, setQuery] = useState(DEFAULT_QUERY);
+  const [searchParams] = useSearchParams();
+  const initialView = VIEWS.find((v) => v.key === searchParams.get('view'))?.key ?? DEFAULT_QUERY.view;
+  const [query, setQuery] = useState({ ...DEFAULT_QUERY, view: initialView });
   const [refreshKey, setRefreshKey] = useState(0);
   const [result, setResult] = useState({ data: [], meta: { total: 0 } });
   const [loading, setLoading] = useState(true);

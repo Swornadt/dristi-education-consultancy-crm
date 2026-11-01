@@ -6,7 +6,7 @@ async function seed() {
 
   try {
     // Create a default admin user
-    const passwordHash = await bcrypt.hash('ChangeMe123!', 10);
+    const passwordHash = await bcrypt.hash('user123', 10);
 
     const insertAdminQuery = `
       INSERT INTO users (full_name, email, password_hash, role_id)
@@ -16,7 +16,7 @@ async function seed() {
     `;
 
     await pool.query(insertAdminQuery, [passwordHash]);
-    console.log('Default admin user created (admin@example.com / ChangeMe123!)');
+    console.log('Default admin user created (admin@example.com / user123)');
 
   } catch (err) {
     console.error('Seeding failed:', err);

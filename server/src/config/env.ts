@@ -12,7 +12,7 @@ export const env = {
   JWT_SECRET: required('JWT_SECRET'),
   DB_HOST: required('DB_HOST'),
   DB_PORT: Number(process.env.DB_PORT ?? 5432),
-  DB_USER: required('DB_USER'),         // 👈 ADD THIS LINE
+  DB_USER: required('DB_USER'),         
   DB_PASSWORD: required('DB_PASSWORD'),
   DB_NAME: required('DB_NAME'),
 };

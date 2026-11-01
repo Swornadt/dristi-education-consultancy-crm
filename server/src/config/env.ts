@@ -9,7 +9,7 @@ function required(name: string): string {
 }
 
 export const env = {
-  PORT: Number(process.env.PORT ?? 5000),
+  PORT: Number(process.env.PORT ?? 5001),
   NODE_ENV: process.env.NODE_ENV ?? 'development',
   JWT_SECRET: required('JWT_SECRET'),
   DB_HOST: required('DB_HOST'),

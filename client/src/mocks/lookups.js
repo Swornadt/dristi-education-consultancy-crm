@@ -1,4 +1,5 @@
-import { ASSIGNABLE_USERS, COUNTRIES } from './data';
+import { COUNTRIES } from './data';
+import { getAssignableUsers } from './users';
 
 const delay = (ms = 120) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -9,5 +10,5 @@ export async function listCountries() {
 
 export async function listAssignableUsers() {
   await delay();
-  return ASSIGNABLE_USERS.map((u) => ({ ...u }));
+  return getAssignableUsers();
 }

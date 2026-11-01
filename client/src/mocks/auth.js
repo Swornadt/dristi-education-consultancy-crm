@@ -35,13 +35,29 @@ const USERS = {
 };
 
 export const MOCK_PASSWORD = 'password123';
+
+// Changed passwords and deactivated users, kept in memory (reset when the page is refreshed).
+const PASSWORDS = new Map();
+const INACTIVE = new Set();
+export const setMockPassword = (userId, password) => PASSWORDS.set(userId, password);
+export const setMockUserActive = (userId, isActive) => (isActive ? INACTIVE.delete(userId) : INACTIVE.add(userId));
+
+// The permission matrix per role, as the mock login hands it out.
+export const ROLE_PERMISSIONS = {
+  admin: adminPermissions,
+  counselor: counselorPermissions,
+  front_desk: frontDeskPermissions,
+};
 export const MOCK_ACCOUNTS = Object.values(USERS).map(({ email, role, fullName }) => ({ email, role, fullName }));
 
 export async function mockLogin(email, password) {
   await delay();
   const user = Object.values(USERS).find((u) => u.email.toLowerCase() === String(email).toLowerCase());
-  if (!user || password !== MOCK_PASSWORD) {
+  if (!user || password !== (PASSWORDS.get(user.id) ?? MOCK_PASSWORD)) {
     throw new ApiError(401, 'UNAUTHENTICATED', 'Incorrect email or password.');
+  }
+  if (INACTIVE.has(user.id)) {
+    throw new ApiError(401, 'UNAUTHENTICATED', 'Your account is deactivated. Ask an admin for help.');
   }
   return { token: `mock-token-${user.role}`, user };
 }
@@ -58,4 +74,18 @@ export async function mockMe() {
 export function getMockCurrentUser() {
   const role = (getToken() || '').replace('mock-token-', '');
   return USERS[role] ?? null;
+}
+
+// POST /auth/change-password
+export async function mockChangePassword(currentPassword, newPassword) {
+  await delay();
+  const user = getMockCurrentUser();
+  if (!user) throw new ApiError(401, 'UNAUTHENTICATED', 'Session expired. Please sign in again.');
+  const details = [];
+  if (currentPassword !== (PASSWORDS.get(user.id) ?? MOCK_PASSWORD)) {
+    details.push({ field: 'currentPassword', message: 'Current password is incorrect.' });
+  }
+  if (!newPassword || newPassword.length < 8) details.push({ field: 'newPassword', message: 'Use at least 8 characters.' });
+  if (details.length) throw new ApiError(400, 'VALIDATION_ERROR', 'Invalid request', details);
+  PASSWORDS.set(user.id, newPassword);
 }

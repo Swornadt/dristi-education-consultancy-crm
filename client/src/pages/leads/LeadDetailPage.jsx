@@ -8,6 +8,7 @@ import Can from '../../components/Can';
 import LeadStatusTag from '../../components/LeadStatusTag';
 import { LEAD_SOURCES, LEAD_STATUSES, TEST_STATUSES, labelOf } from '../../config/leadOptions';
 import { formatDate, formatDateTime, formatIntake } from '../../utils/format';
+import LeadTasksCard from '../tasks/LeadTasksCard';
 import ActivityPanel from './ActivityPanel';
 import LeadFormModal from './LeadFormModal';
 import LostReasonModal from './LostReasonModal';
@@ -209,9 +210,14 @@ export default function LeadDetailPage() {
 
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={10}>
-          <Card title="Details">
-            <Descriptions column={1} size="small" items={details} />
-          </Card>
+          <Space direction="vertical" size={16} style={{ width: '100%' }}>
+            <Card title="Details">
+              <Descriptions column={1} size="small" items={details} />
+            </Card>
+            <Can module="tasks" action="view">
+              <LeadTasksCard lead={lead} counselors={counselors} />
+            </Can>
+          </Space>
         </Col>
         <Col xs={24} lg={14}>
           <ActivityPanel leadId={lead.id} activities={activities} canAdd={canUpdate} onAdded={refreshActivities} />

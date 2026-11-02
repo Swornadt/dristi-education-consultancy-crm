@@ -1,5 +1,5 @@
 import api from './client';
-import { mockLogin, mockMe } from '../mocks/auth';
+import { mockChangePassword, mockLogin, mockMe } from '../mocks/auth';
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
 
@@ -15,4 +15,11 @@ export async function getMe() {
   if (USE_MOCK) return mockMe();
   const { data } = await api.get('/auth/me');
   return data;
+}
+
+// POST /auth/change-password { currentPassword, newPassword }
+export async function changePassword(currentPassword, newPassword) {
+  if (USE_MOCK) return mockChangePassword(currentPassword, newPassword);
+  await api.post('/auth/change-password', { currentPassword, newPassword });
+  return undefined;
 }

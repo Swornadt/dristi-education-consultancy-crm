@@ -191,7 +191,7 @@ export default function LeadListPage() {
           pagination={{
             current: query.page,
             pageSize: query.limit,
-            total: result.meta.total,
+            total: result?.meta?.total ?? 0,
             showSizeChanger: true,
             showTotal: (total) => `${total} leads`,
           }}

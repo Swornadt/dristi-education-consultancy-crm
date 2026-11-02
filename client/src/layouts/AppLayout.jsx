@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Dropdown, Layout, Menu, Space, Tag, Typography } from 'antd';
-import { DownOutlined, LogoutOutlined, UserOutlined } from '@ant-design/icons';
+import { DownOutlined, KeyOutlined, LogoutOutlined, UserOutlined } from '@ant-design/icons';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import ChangePasswordModal from '../components/ChangePasswordModal';
 import { NAV_ITEMS } from '../config/modules';
 import { APP_NAME, APP_SHORT_NAME, ROLE_LABELS } from '../theme';
 
@@ -13,6 +14,7 @@ export default function AppLayout() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [collapsed, setCollapsed] = useState(false);
+  const [passwordOpen, setPasswordOpen] = useState(false);
 
   // Only show modules the user is allowed to view.
   const menuItems = NAV_ITEMS.filter((item) => can(item.module, 'view')).map((item) => ({
@@ -25,7 +27,10 @@ export default function AppLayout() {
   const selectedKey = `/${pathname.split('/')[1]}`;
 
   const userMenu = {
-    items: [{ key: 'logout', icon: <LogoutOutlined />, label: 'Sign out', onClick: logout }],
+    items: [
+      { key: 'password', icon: <KeyOutlined />, label: 'Change password', onClick: () => setPasswordOpen(true) },
+      { key: 'logout', icon: <LogoutOutlined />, label: 'Sign out', onClick: logout },
+    ],
   };
 
   return (
@@ -64,6 +69,7 @@ export default function AppLayout() {
           <Outlet />
         </Content>
       </Layout>
+      <ChangePasswordModal open={passwordOpen} onClose={() => setPasswordOpen(false)} />
     </Layout>
   );
 }

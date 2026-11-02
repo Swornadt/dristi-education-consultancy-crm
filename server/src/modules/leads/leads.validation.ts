@@ -60,3 +60,12 @@ export const createActivitySchema = z.object({
     occurredAt: z.string().datetime().optional()
   })
 });
+export const convertLeadSchema = z.object({
+  body: z.object({
+    dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD').optional(),
+    nationality: z.string().max(100).optional(),
+    address: z.string().max(500).optional(),
+    guardianName: z.string().max(255).optional(),
+    guardianPhone: z.string().max(50).optional(),
+  }).optional().default({})
+});

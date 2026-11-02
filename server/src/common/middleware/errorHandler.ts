@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { AppError } from '../errors/AppError';
+import multer from 'multer';
 
 export function globalErrorHandler(
   err: any,
@@ -7,7 +8,25 @@ export function globalErrorHandler(
   res: Response,
   _next: NextFunction
 ) {
-  // 1. Custom AppError
+  // 1. Multer errors (file too large, etc.)
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({
+        error: {
+          code: 'FILE_TOO_LARGE',
+          message: 'File exceeds the 10MB limit',
+        },
+      });
+    }
+    return res.status(400).json({
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: err.message,
+      },
+    });
+  }
+
+  // 2. Custom AppError
   if (err instanceof AppError) {
     return res.status(err.statusCode).json({
       error: {
@@ -18,7 +37,7 @@ export function globalErrorHandler(
     });
   }
 
-  // 2. Malformed JSON body (Express body-parser error)
+  // 3. Malformed JSON body (Express body-parser error)
   if (err.type === 'entity.parse.failed' || err instanceof SyntaxError) {
     return res.status(400).json({
       error: {
@@ -28,7 +47,7 @@ export function globalErrorHandler(
     });
   }
 
-  // 3. Fallback
+  // 4. Fallback
   console.error('Unhandled Error:', err);
   return res.status(500).json({
     error: {

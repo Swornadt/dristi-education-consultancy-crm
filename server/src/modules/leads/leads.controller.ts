@@ -41,3 +41,7 @@ export const getActivities = asyncHandler(async (req: Request, res: Response) =>
 export const createActivity = asyncHandler(async (req: Request, res: Response) => {
   res.status(201).json(await service.createActivity(req.user as JwtPayload, Number(req.params.id), req.body));
 });
+export const convert = asyncHandler(async (req: Request, res: Response) => {
+  const data = await service.convert(req.user as JwtPayload, Number(req.params.id), req.body);
+  res.status(201).json(data);
+});

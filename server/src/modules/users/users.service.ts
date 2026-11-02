@@ -3,7 +3,7 @@ import { AppError } from '../../common/errors/AppError';
 import * as queries from './users.queries';
 
 const mapUser = (u: any) => ({
-  id: u.id,
+  id: Number(u.id),
   fullName: u.full_name,
   email: u.email,
   role: u.role_name,
@@ -11,6 +11,7 @@ const mapUser = (u: any) => ({
   lastLoginAt: u.last_login_at,
   createdAt: u.created_at,
 });
+
 export async function list(filters: any) {
   const users = await queries.listUsers(filters);
   return users.map(mapUser);
@@ -55,7 +56,7 @@ export async function update(id: number, data: any) {
 
 export async function getAssignable() {
   const rows = await queries.getAssignableCounselors();
-  return rows.map((r) => ({ id: r.id, fullName: r.full_name }));
+  return rows.map((r) => ({ id: Number(r.id), fullName: r.full_name })); 
 }
 
 export async function getRoles() {

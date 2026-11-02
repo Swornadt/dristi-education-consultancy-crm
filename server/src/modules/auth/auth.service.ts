@@ -21,7 +21,11 @@ export async function login(email: string, passwordPlain: string) {
 
   // Set token lifetime 8 hours
   const token = jwt.sign(
-    { id: user.id, role: user.role_name,permissions },
+    { 
+      id: Number(user.id), 
+      role: user.role_name, 
+      permissions 
+    },
     env.JWT_SECRET,
     { expiresIn: '8h' }
   );
@@ -29,7 +33,7 @@ export async function login(email: string, passwordPlain: string) {
   await queries.updateLastLogin(user.id);
 
   const authUser: AuthUser = {
-    id: user.id,
+    id: Number(user.id),
     fullName: user.full_name,
     email: user.email,
     role: user.role_name,
@@ -46,7 +50,7 @@ export async function getMe(userId: number) {
   const permissions = await queries.getUserPermissions(user.id);
 
   return {
-    id: user.id,
+    id: Number(user.id),
     fullName: user.full_name,
     email: user.email,
     role: user.role_name,

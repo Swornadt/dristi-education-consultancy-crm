@@ -10,6 +10,7 @@ import LeadStatusTag from '../../components/LeadStatusTag';
 import { LEAD_SOURCES, LEAD_STATUSES, labelOf } from '../../config/leadOptions';
 import { formatDate, formatIntake } from '../../utils/format';
 import LeadFormModal from './LeadFormModal';
+import LeadViewToggle from './LeadViewToggle';
 import useLeadLookups from './useLeadLookups';
 
 const DEFAULT_QUERY = { page: 1, limit: 20, sort: '-createdAt' };
@@ -104,9 +105,12 @@ export default function LeadListPage() {
     <>
       {contextHolder}
       <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }} align="start" wrap>
-        <Typography.Title level={3} style={{ margin: 0 }}>
-          {seesAll ? 'Leads' : 'My leads'}
-        </Typography.Title>
+        <Space align="center" size={16} wrap>
+          <Typography.Title level={3} style={{ margin: 0 }}>
+            {seesAll ? 'Leads' : 'My leads'}
+          </Typography.Title>
+          <LeadViewToggle value="list" />
+        </Space>
         <Can module="leads" action="create">
           <Button type="primary" icon={<PlusOutlined />} onClick={() => setFormOpen(true)}>
             Add lead

@@ -1,0 +1,9 @@
+BEGIN;
+
+ALTER TABLE users
+ADD COLUMN token_version INT NOT NULL DEFAULT 1;
+
+ALTER TABLE user_permissions
+ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now ();
+
+COMMIT;

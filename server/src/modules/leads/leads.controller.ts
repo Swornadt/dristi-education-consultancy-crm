@@ -24,8 +24,6 @@ export const remove = asyncHandler(async (req: Request, res: Response) => {
   res.status(204).send();
 });
 
-// Missing functions added below
-
 export const updateStatus = asyncHandler(async (req: Request, res: Response) => {
   res.json(await service.updateStatus(req.user as JwtPayload, Number(req.params.id), req.body.status, req.body.lostReason));
 });

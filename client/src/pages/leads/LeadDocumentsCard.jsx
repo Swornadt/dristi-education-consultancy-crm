@@ -40,7 +40,8 @@ export default function LeadDocumentsCard({ lead }) {
   useEffect(() => {
     listDocumentTypes()
       .then(setDocTypes)
-      .catch(() => {});
+      .catch(() => {})
+      .finally(console.log(docTypes));
   }, []);
 
   const run = async (action, successText) => {

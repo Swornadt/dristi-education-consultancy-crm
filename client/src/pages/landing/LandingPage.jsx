@@ -77,8 +77,8 @@ const STEP_MS = 6000;
 const DOCS_BASE = `${CONFIG.repoUrl}/blob/main/docs/`;
 const ERD_IMAGE = ''; // optional: path to an exported ERD image, e.g. '/erd.png' in /public
 const DOCS = [
-  { title: 'Product requirements', text: 'Goals, non-goals, roles, modules and success criteria.', tag: 'PDF', file: 'Study_Abroad_CRM_Product_Requirements_Document.pdf' },
-  { title: 'API contract', text: 'The endpoints the front end and back end agreed on, with request and response shapes.', tag: 'Markdown', file: 'api-contract.md' },
+  { title: 'Product requirements', text: 'Goals, non-goals, roles, modules and success criteria.', tag: 'PDF', file: 'eduCRM - PRD.pdf' },
+  { title: 'API Contract', text: 'The endpoints the front end and back end agreed on, with request and response shapes.', tag: 'PDF', file: 'eduCRM - API Contract (v1).pdf' },
   { title: 'Database schema and ERD', text: 'Tables and relationships behind leads, students, documents and applications.', tag: 'SQL and diagram', file: 'schema.md' },
   { title: 'Permission design', text: 'How role defaults, the editable matrix and per-person overrides combine.', tag: 'Markdown', file: 'permissions.md' },
 ];

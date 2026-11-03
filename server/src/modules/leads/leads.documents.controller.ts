@@ -8,6 +8,10 @@ export const listDocuments = asyncHandler(async (req: Request, res: Response) =>
   res.json({ data: await docsService.list(req.user as JwtPayload, Number(req.params.id)) });
 });
 
+export async function listDocumentTypes(req: Request, res: Response) {
+  res.json({ data: await docsService.listDocumentTypes() });
+}
+
 export const uploadDocument = asyncHandler(async (req: Request, res: Response) => {
   if (!req.file) throw new AppError('VALIDATION_ERROR', 'No file uploaded', 400);
   const data = await docsService.upload(req.user as JwtPayload, Number(req.params.id), req.file, req.body);

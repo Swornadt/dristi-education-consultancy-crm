@@ -17,6 +17,16 @@ export async function listLeadDocuments(leadId: number) {
   return rows;
 }
 
+export async function listDocumentTypes() {
+  const result = await pool.query(
+    `SELECT id, name, in_default_checklist AS "inDefaultChecklist", is_active AS "isActive" 
+     FROM document_types 
+     WHERE is_active = true 
+     ORDER BY name ASC`
+  );
+  return result.rows;
+}
+
 export async function createFileRecord(
   originalName: string,
   storedPath: string,

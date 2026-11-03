@@ -22,6 +22,17 @@ export async function list(user: JwtPayload, leadId: number) {
   }));
 }
 
+export async function listDocumentTypes() {
+  const rows = await queries.listDocumentTypes();
+  
+  return rows.map(d => ({
+    id: d.id,
+    name: d.name,
+    inDefaultChecklist: d.inDefaultChecklist,
+    isActive: d.isActive,
+  }));
+}
+
 export async function upload(user: JwtPayload, leadId: number, file: Express.Multer.File, body: any) {
   await leadService.getOne(user, leadId);
 

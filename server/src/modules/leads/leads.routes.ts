@@ -19,6 +19,8 @@ const router = Router();
 
 router.use(verifyJWT);
 
+router.get('/document-types', requirePermission('documents:view'), docsController.listDocumentTypes);
+
 router.get('/', requirePermission('leads:view'), controller.list);
 router.post('/', requirePermission('leads:create'), validate(createLeadSchema), controller.create);
 

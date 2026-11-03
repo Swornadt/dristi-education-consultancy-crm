@@ -1,15 +1,18 @@
 import { pool } from '../../config/db';
+import { convertLeadTransaction } from './leads.convert.queries';
 
 export async function listLeads(filters: any, scope: 'own' | 'all', userId: number) {
   let query = `
     SELECT l.*, 
            c.name as dest_country_name, 
            u1.full_name as assigned_to_name, 
-           u2.full_name as created_by_name
+           u2.full_name as created_by_name,
+           s.id as student_id
     FROM leads l
     LEFT JOIN countries c ON c.id = l.destination_country_id
     LEFT JOIN users u1 ON u1.id = l.assigned_to
     LEFT JOIN users u2 ON u2.id = l.created_by
+    LEFT JOIN students s ON s.lead_id = l.id
     WHERE 1=1
   `;
   const params: any[] = [];
@@ -47,11 +50,12 @@ export async function listLeads(filters: any, scope: 'own' | 'all', userId: numb
 
 export async function getLeadById(id: number) {
   const { rows } = await pool.query(
-    `SELECT l.*, c.name as dest_country_name, u1.full_name as assigned_to_name, u2.full_name as created_by_name
+    `SELECT l.*, c.name as dest_country_name, u1.full_name as assigned_to_name, u2.full_name as created_by_name, s.id as student_id
      FROM leads l
      LEFT JOIN countries c ON c.id = l.destination_country_id
      LEFT JOIN users u1 ON u1.id = l.assigned_to
      LEFT JOIN users u2 ON u2.id = l.created_by
+     LEFT JOIN students s ON s.lead_id = l.id
      WHERE l.id = $1`,
     [id]
   );
@@ -157,4 +161,23 @@ export async function getUserById(id: number) {
     [id]
   );
   return rows[0] || null;
+}
+
+export async function convertLead(leadId: number, body: any, userId: number) {
+  return convertLeadTransaction(leadId, body, userId);
+}
+
+export async function getLeadDocumentsWithPaths(leadId: number) {
+  const { rows } = await pool.query(
+    `SELECT ld.file_id, f.stored_path 
+     FROM lead_documents ld 
+     JOIN files f ON f.id = ld.file_id 
+     WHERE ld.lead_id = $1`,
+    [leadId]
+  );
+  return rows;
+}
+
+export async function deleteFileById(fileId: number) {
+  await pool.query(`DELETE FROM files WHERE id = $1`, [fileId]);
 }

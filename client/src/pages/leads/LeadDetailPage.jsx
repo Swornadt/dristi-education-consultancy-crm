@@ -9,6 +9,7 @@ import LeadStatusTag from '../../components/LeadStatusTag';
 import { LEAD_SOURCES, LEAD_STATUSES, TEST_STATUSES, labelOf } from '../../config/leadOptions';
 import { formatDate, formatDateTime, formatIntake } from '../../utils/format';
 import LeadTasksCard from '../tasks/LeadTasksCard';
+import LeadDocumentsCard from './LeadDocumentsCard';
 import ActivityPanel from './ActivityPanel';
 import LeadFormModal from './LeadFormModal';
 import LostReasonModal from './LostReasonModal';
@@ -216,6 +217,9 @@ export default function LeadDetailPage() {
             </Card>
             <Can module="tasks" action="view">
               <LeadTasksCard lead={lead} counselors={counselors} />
+            </Can>
+            <Can module="documents" action="view">
+              <LeadDocumentsCard lead={lead} />
             </Can>
           </Space>
         </Col>

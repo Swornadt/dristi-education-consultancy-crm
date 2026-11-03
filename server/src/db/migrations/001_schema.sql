@@ -1,16 +1,12 @@
--- =====================================================================
 -- Education Consultancy CRM: PostgreSQL schema (v1)
 -- Single organization, single currency, 3 roles (admin, counselor, front_desk)
 -- Conventions: snake_case, BIGINT identity keys, timestamptz everywhere,
 --              created_at / updated_at on mutable tables.
 -- Run on an empty database:  psql -d crm -f schema.sql
--- =====================================================================
 
 BEGIN;
 
--- ---------------------------------------------------------------------
--- Enum types
--- ---------------------------------------------------------------------
+
 CREATE TYPE perm_scope         AS ENUM ('own', 'all');
 CREATE TYPE lead_status        AS ENUM ('new', 'contacted', 'counseling_scheduled', 'converted', 'lost');
 CREATE TYPE lead_source        AS ENUM ('walk_in', 'website', 'facebook', 'instagram', 'referral', 'event', 'phone', 'other');
@@ -23,9 +19,7 @@ CREATE TYPE program_level      AS ENUM ('foundation', 'diploma', 'bachelor', 'ma
 CREATE TYPE intake_term        AS ENUM ('spring', 'summer', 'fall', 'winter');
 CREATE TYPE account_kind       AS ENUM ('income', 'expense');
 
--- ---------------------------------------------------------------------
--- Generic trigger: keep updated_at current
--- ---------------------------------------------------------------------
+
 CREATE FUNCTION set_updated_at() RETURNS trigger AS $$
 BEGIN
   NEW.updated_at = now();
@@ -33,9 +27,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- ---------------------------------------------------------------------
--- 1. Auth and RBAC
--- ---------------------------------------------------------------------
+
 CREATE TABLE roles (
   id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   name        TEXT NOT NULL UNIQUE,            -- admin | counselor | front_desk
@@ -72,9 +64,9 @@ CREATE TABLE users (
 CREATE UNIQUE INDEX users_email_uq ON users (lower(email));
 CREATE TRIGGER users_updated BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
--- ---------------------------------------------------------------------
+
 -- 2. Catalog: countries > universities > programs > intakes
--- ---------------------------------------------------------------------
+
 CREATE TABLE countries (
   id        BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   name      TEXT NOT NULL UNIQUE,
@@ -125,9 +117,9 @@ CREATE TABLE program_intakes (
 );
 CREATE INDEX program_intakes_program_idx ON program_intakes (program_id);
 
--- ---------------------------------------------------------------------
+
 -- 3. Files (all uploads are recorded here; other tables reference file_id)
--- ---------------------------------------------------------------------
+-- 
 CREATE TABLE files (
   id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   original_name TEXT NOT NULL,
@@ -145,9 +137,7 @@ CREATE TABLE document_types (
   is_active           BOOLEAN NOT NULL DEFAULT TRUE
 );
 
--- ---------------------------------------------------------------------
--- 4. Leads
--- ---------------------------------------------------------------------
+
 CREATE TABLE leads (
   id                    BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   full_name             TEXT NOT NULL,
@@ -201,9 +191,8 @@ CREATE TABLE lead_documents (
 );
 CREATE INDEX lead_documents_lead_idx ON lead_documents (lead_id);
 
--- ---------------------------------------------------------------------
 -- 5. Students (created by converting a lead)
--- ---------------------------------------------------------------------
+
 CREATE TABLE students (
   id                BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   lead_id           BIGINT NOT NULL UNIQUE REFERENCES leads(id),
@@ -270,9 +259,9 @@ CREATE TABLE student_documents (
 );
 CREATE TRIGGER student_documents_updated BEFORE UPDATE ON student_documents FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
--- ---------------------------------------------------------------------
+
 -- 6. Tasks / follow-ups (attached to a lead or a student)
--- ---------------------------------------------------------------------
+
 CREATE TABLE tasks (
   id           BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   lead_id      BIGINT REFERENCES leads(id) ON DELETE CASCADE,
@@ -293,9 +282,6 @@ CREATE INDEX tasks_lead_idx    ON tasks (lead_id);
 CREATE INDEX tasks_student_idx ON tasks (student_id);
 CREATE TRIGGER tasks_updated BEFORE UPDATE ON tasks FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
--- ---------------------------------------------------------------------
--- 7. Applications
--- ---------------------------------------------------------------------
 CREATE TABLE applications (
   id                BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   student_id        BIGINT NOT NULL REFERENCES students(id) ON DELETE CASCADE,
@@ -326,9 +312,8 @@ CREATE TABLE application_status_history (
 );
 CREATE INDEX application_history_app_idx ON application_status_history (application_id, changed_at);
 
--- ---------------------------------------------------------------------
 -- 8. Accounts (internal office bookkeeping only: no student fees/commissions)
--- ---------------------------------------------------------------------
+
 CREATE TABLE account_categories (
   id        BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   name      TEXT NOT NULL UNIQUE,
@@ -352,10 +337,6 @@ CREATE TABLE account_entries (
 CREATE INDEX account_entries_date_idx     ON account_entries (entry_date);
 CREATE INDEX account_entries_category_idx ON account_entries (category_id);
 CREATE TRIGGER account_entries_updated BEFORE UPDATE ON account_entries FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-
--- =====================================================================
--- Reference / seed data
--- =====================================================================
 
 INSERT INTO roles (name, description) VALUES
   ('admin',      'Full access; manages users, catalog, accounts and reports'),

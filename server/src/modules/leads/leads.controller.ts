@@ -24,8 +24,6 @@ export const remove = asyncHandler(async (req: Request, res: Response) => {
   res.status(204).send();
 });
 
-// Missing functions added below
-
 export const updateStatus = asyncHandler(async (req: Request, res: Response) => {
   res.json(await service.updateStatus(req.user as JwtPayload, Number(req.params.id), req.body.status, req.body.lostReason));
 });
@@ -40,4 +38,8 @@ export const getActivities = asyncHandler(async (req: Request, res: Response) =>
 
 export const createActivity = asyncHandler(async (req: Request, res: Response) => {
   res.status(201).json(await service.createActivity(req.user as JwtPayload, Number(req.params.id), req.body));
+});
+export const convert = asyncHandler(async (req: Request, res: Response) => {
+  const data = await service.convert(req.user as JwtPayload, Number(req.params.id), req.body);
+  res.status(201).json(data);
 });

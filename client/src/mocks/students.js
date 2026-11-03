@@ -6,6 +6,7 @@ import { getMockCurrentUser } from './auth';
 import { COUNTRIES, USER_NAMES } from './data';
 import { DOCUMENT_TYPES } from './documentTypes';
 import { saveMockFile, seedMockFile } from './files';
+import { getLeadAttachments, getLeadAttachmentsOut } from './leadDocuments';
 import { getMockConvertedLeads } from './leads';
 
 const delay = (ms = 200) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -80,7 +81,18 @@ function buildStudent(lead) {
     updatedAt: lead.convertedAt || nowIso(),
   };
   students.push(student);
-  checklists.set(id, defaultChecklist(id, seeded));
+  const list = defaultChecklist(id, seeded);
+  if (!seeded) {
+    // A lead converted just now: documents already attached to the lead count as received.
+    getLeadAttachments(lead.id).forEach((doc) => {
+      const item = list.find((i) => i.documentType.id === doc.documentTypeId && i.status === 'pending');
+      if (item) {
+        item.status = 'received';
+        item.file = { ...doc.file };
+      }
+    });
+  }
+  checklists.set(id, list);
 }
 
 // Create a student for any converted lead that does not have one yet.
@@ -265,8 +277,7 @@ export async function listStudentDocuments(id) {
   await delay();
   const { student } = findStudent(id, 'view');
   access('documents', 'view');
-  // Documents attached to the original lead would appear in leadAttachments; none in the mock.
-  return { checklist: (checklists.get(student.id) ?? []).map(serializeItem), leadAttachments: [] };
+  return { checklist: (checklists.get(student.id) ?? []).map(serializeItem), leadAttachments: getLeadAttachmentsOut(student.leadId) };
 }
 
 export async function addChecklistItem(id, documentTypeId) {

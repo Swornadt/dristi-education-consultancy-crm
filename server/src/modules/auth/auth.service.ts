@@ -4,10 +4,11 @@ import { env } from '../../config/env';
 import { AppError } from '../../common/errors/AppError';
 import * as queries from './auth.queries';
 import { AuthUser } from '../../types/auth';
+import { getEffectivePermissions } from './permissions.service';
 
 export async function login(email: string, passwordPlain: string) {
   const user = await queries.findUserByEmail(email);
-  
+
   if (!user || !user.is_active) {
     throw new AppError('UNAUTHENTICATED', 'Invalid email or password', 401);
   }
@@ -17,11 +18,15 @@ export async function login(email: string, passwordPlain: string) {
     throw new AppError('UNAUTHENTICATED', 'Invalid email or password', 401);
   }
 
-  const permissions = await queries.getUserPermissions(user.id);
+  const permissions = await getEffectivePermissions(Number(user.id));
 
-  // Set token lifetime 8 hours
   const token = jwt.sign(
-    { id: user.id, role: user.role_name,permissions },
+    {
+      id: Number(user.id),
+      role: user.role_name,
+      permissions,
+      tokenVersion: Number(user.token_version),
+    },
     env.JWT_SECRET,
     { expiresIn: '8h' }
   );
@@ -29,7 +34,7 @@ export async function login(email: string, passwordPlain: string) {
   await queries.updateLastLogin(user.id);
 
   const authUser: AuthUser = {
-    id: user.id,
+    id: Number(user.id),
     fullName: user.full_name,
     email: user.email,
     role: user.role_name,
@@ -43,10 +48,10 @@ export async function getMe(userId: number) {
   const user = await queries.findUserById(userId);
   if (!user) throw new AppError('NOT_FOUND', 'User not found', 404);
 
-  const permissions = await queries.getUserPermissions(user.id);
+  const permissions = await getEffectivePermissions(Number(user.id));
 
   return {
-    id: user.id,
+    id: Number(user.id),
     fullName: user.full_name,
     email: user.email,
     role: user.role_name,
@@ -65,4 +70,5 @@ export async function changePassword(userId: number, currentPlain: string, newPl
 
   const newHash = await bcrypt.hash(newPlain, 10);
   await queries.updatePassword(userId, newHash);
+  await queries.incrementTokenVersion(userId);
 }

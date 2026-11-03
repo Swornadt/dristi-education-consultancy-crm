@@ -18,7 +18,8 @@ export interface AuthUser {
 export interface JwtPayload {
   id: number;
   role: string;
-  permissions:Permission[];
+  permissions: Permission[];
+  tokenVersion: number; 
 }
 
 declare global {

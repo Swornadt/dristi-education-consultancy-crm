@@ -58,13 +58,13 @@ export async function createUser(data: any) {
 }
 
 export async function updateUser(id: number, data: any) {
-  let query = `UPDATE users SET updated_at = now()`;
+  let query = `UPDATE users SET updated_at = now(), token_version = token_version + 1`;
   const params: any[] = [];
 
-  if (data.fullName) { params.push(data.fullName); query += `, full_name = $${params.length}`; }
-  if (data.roleId) { params.push(data.roleId); query += `, role_id = $${params.length}`; }
+  if (data.fullName !== undefined) { params.push(data.fullName); query += `, full_name = $${params.length}`; }
+  if (data.roleId !== undefined) { params.push(data.roleId); query += `, role_id = $${params.length}`; }
   if (data.isActive !== undefined) { params.push(data.isActive); query += `, is_active = $${params.length}`; }
-  if (data.passwordHash) { params.push(data.passwordHash); query += `, password_hash = $${params.length}`; }
+  if (data.passwordHash !== undefined) { params.push(data.passwordHash); query += `, password_hash = $${params.length}`; }
 
   params.push(id);
   query += ` WHERE id = $${params.length}`;
@@ -100,4 +100,31 @@ export async function getRolesWithPermissions() {
         scope: p.scope,
       })),
   }));
+}
+
+export async function hasOverrides(userId: number) {
+  const { rows } = await pool.query(
+    `SELECT EXISTS(SELECT 1 FROM user_permissions WHERE user_id = $1) AS has`,
+    [userId]
+  );
+  return rows[0].has;
+}
+
+export async function getUserOverrides(userId: number) {
+  const { rows } = await pool.query(
+    `SELECT module, action, effect, scope FROM user_permissions WHERE user_id = $1`,
+    [userId]
+  );
+  return rows;
+}
+
+export async function deleteUserOverrides(client: any, userId: number) {
+  await client.query('DELETE FROM user_permissions WHERE user_id = $1', [userId]);
+}
+
+export async function insertUserOverride(client: any, userId: number, o: any) {
+  await client.query(
+    `INSERT INTO user_permissions (user_id, module, action, effect, scope) VALUES ($1, $2, $3, $4, $5)`,
+    [userId, o.module, o.action, o.effect, o.scope || null]
+  );
 }

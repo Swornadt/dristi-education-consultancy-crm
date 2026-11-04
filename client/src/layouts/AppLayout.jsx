@@ -1,9 +1,11 @@
-import { useState } from 'react';
-import { Dropdown, Layout, Menu, Space, Tag, Typography } from 'antd';
+import { Suspense, useState } from 'react';
+import { Alert, Dropdown, Layout, Menu, Space, Spin, Tag, Typography } from 'antd';
 import { DownOutlined, KeyOutlined, LogoutOutlined, UserOutlined } from '@ant-design/icons';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import ChangePasswordModal from '../components/ChangePasswordModal';
+import ErrorBoundary from '../components/ErrorBoundary';
+import useOnlineStatus from '../hooks/useOnlineStatus';
 import { NAV_ITEMS } from '../config/modules';
 import { APP_NAME, APP_SHORT_NAME, ROLE_LABELS } from '../theme';
 
@@ -15,6 +17,7 @@ export default function AppLayout() {
   const { pathname } = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
+  const online = useOnlineStatus();
 
   // Only show modules the user is allowed to view.
   const menuItems = NAV_ITEMS.filter((item) => can(item.module, 'view')).map((item) => ({
@@ -65,8 +68,23 @@ export default function AppLayout() {
             </Typography.Link>
           </Dropdown>
         </Header>
+        {!online && (
+          <Alert banner type="warning" showIcon message="You're offline. Changes can't be saved until the connection is back." />
+        )}
         <Content className="app-content">
-          <Outlet />
+          {/* Keyed by path so moving to another page clears a crashed one; the sidebar stays usable. */}
+          <ErrorBoundary resetKey={pathname}>
+            {/* Pages are lazy-loaded: the sidebar and header stay put while a page's code downloads. */}
+            <Suspense
+              fallback={
+                <div style={{ display: 'grid', placeItems: 'center', padding: 80 }}>
+                  <Spin size="large" />
+                </div>
+              }
+            >
+              <Outlet />
+            </Suspense>
+          </ErrorBoundary>
         </Content>
       </Layout>
       <ChangePasswordModal open={passwordOpen} onClose={() => setPasswordOpen(false)} />

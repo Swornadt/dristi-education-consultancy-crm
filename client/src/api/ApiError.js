@@ -8,4 +8,9 @@ export class ApiError extends Error {
     this.code = code;
     this.details = details;
   }
+
+  // No response at all: server down, offline, or timed out. Not the same as "the server said no".
+  get isConnectionProblem() {
+    return this.status === 0;
+  }
 }

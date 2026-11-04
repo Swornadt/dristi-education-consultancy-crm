@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { getMe, login as loginRequest } from '../api/auth';
 import { setUnauthorizedHandler } from '../api/client';
-import { clearToken, getToken, setToken } from '../api/token';
+import { clearToken, getToken, setLoginNotice, setToken } from '../api/token';
 
 const AuthContext = createContext(null);
 
@@ -10,26 +10,38 @@ export function AuthProvider({ children }) {
   // If a token is stored, we are "loading" until /auth/me confirms it.
   const [loading, setLoading] = useState(() => Boolean(getToken()));
 
+  // Set when we could not confirm the stored session because the server was unreachable or failing.
+  // The token is kept in that case: a server outage must not sign everyone out.
+  const [bootError, setBootError] = useState(null);
+  const [bootAttempt, setBootAttempt] = useState(0);
+
   const logout = useCallback(() => {
     clearToken();
     setUser(null);
+    setBootError(null);
   }, []);
 
-  // Expired or invalid token anywhere in the app -> sign out.
+  // Expired, revoked or invalid token anywhere in the app -> sign out and tell the person why.
   useEffect(() => {
-    setUnauthorizedHandler(logout);
+    setUnauthorizedHandler(() => {
+      if (getToken()) setLoginNotice('Your session has ended. Please sign in again.');
+      logout();
+    });
   }, [logout]);
 
-  // Restore the session on page load.
+  // Restore the session on page load (and again when the person hits "Try again").
   useEffect(() => {
     if (!getToken()) return undefined;
     let cancelled = false;
+    setLoading(true);
+    setBootError(null);
     getMe()
       .then((me) => {
         if (!cancelled) setUser(me);
       })
-      .catch(() => {
-        if (!cancelled) logout();
+      .catch((err) => {
+        // A 401 already signed the person out through the interceptor. Anything else is not their fault.
+        if (!cancelled && err?.status !== 401) setBootError(err);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -37,7 +49,9 @@ export function AuthProvider({ children }) {
     return () => {
       cancelled = true;
     };
-  }, [logout]);
+  }, [bootAttempt]);
+
+  const retryBoot = useCallback(() => setBootAttempt((n) => n + 1), []);
 
   const login = useCallback(async (email, password) => {
     const { token, user: me } = await loginRequest(email, password);
@@ -59,8 +73,8 @@ export function AuthProvider({ children }) {
   );
 
   const value = useMemo(
-    () => ({ user, loading, login, logout, can, scopeOf }),
-    [user, loading, login, logout, can, scopeOf]
+    () => ({ user, loading, bootError, retryBoot, login, logout, can, scopeOf }),
+    [user, loading, bootError, retryBoot, login, logout, can, scopeOf]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

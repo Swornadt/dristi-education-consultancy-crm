@@ -3,6 +3,7 @@ import { Alert, Button, Form, Input, Space, Typography } from 'antd';
 import { LockOutlined, MailOutlined } from '@ant-design/icons';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import { takeLoginNotice } from '../api/token';
 import { MOCK_ACCOUNTS, MOCK_PASSWORD } from '../mocks/auth';
 import { APP_NAME, ROLE_LABELS } from '../theme';
 
@@ -14,6 +15,8 @@ export default function LoginPage() {
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  // e.g. "Your session has ended". Read once so it does not reappear on the next visit.
+  const [notice] = useState(() => takeLoginNotice());
 
   // After a successful login `user` is set and we land back where the person was headed.
   const from = location.state?.from?.pathname || '/';
@@ -42,6 +45,7 @@ export default function LoginPage() {
             Sign in
           </Typography.Title>
 
+          {notice && !error && <Alert type="info" message={notice} showIcon style={{ marginBottom: 16 }} />}
           {error && <Alert type="error" message={error} showIcon style={{ marginBottom: 16 }} />}
 
           <Form form={form} layout="vertical" onFinish={onFinish} requiredMark={false}>

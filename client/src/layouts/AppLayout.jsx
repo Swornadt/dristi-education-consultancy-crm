@@ -1,6 +1,7 @@
 import { Suspense, useState } from 'react';
 import { Alert, Dropdown, Layout, Menu, Space, Spin, Tag, Typography } from 'antd';
 import { DownOutlined, KeyOutlined, LogoutOutlined, UserOutlined } from '@ant-design/icons';
+import TaskAlertsPopover from '../components/TaskAlertsPopover';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import ChangePasswordModal from '../components/ChangePasswordModal';
@@ -58,6 +59,7 @@ export default function AppLayout() {
       <Layout>
         <Header className="app-header">
           <Tag color="blue">{ROLE_LABELS[user.role] ?? user.role}</Tag>
+          <TaskAlertsPopover />
           <Dropdown menu={userMenu} trigger={['click']}>
             <Typography.Link style={{ color: 'inherit' }}>
               <Space>

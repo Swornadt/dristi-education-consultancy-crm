@@ -122,11 +122,15 @@ export async function assign(user: JwtPayload, id: number, assignedTo: number) {
 }
 
 export async function remove(user: JwtPayload, id: number) {
-  await getOne(user, id);
+  const lead = await getOne(user, id);
+  
+  if (lead.status === 'converted') {
+    throw new AppError('CONFLICT', 'Cannot delete a converted lead — it has an associated student record', 409);
+  }
+  
   const docs = await queries.getLeadDocumentsWithPaths(id);
   await queries.deleteLead(id);
   
-  //delete physical files 
   for (const doc of docs) {
     try {
       if (doc.stored_path && fs.existsSync(doc.stored_path)) {
@@ -137,7 +141,6 @@ export async function remove(user: JwtPayload, id: number) {
       console.error(`Failed to delete file ${doc.stored_path}:`, err);
     }
     
-    // Delete the files 
     await queries.deleteFileById(doc.file_id);
   }
 }

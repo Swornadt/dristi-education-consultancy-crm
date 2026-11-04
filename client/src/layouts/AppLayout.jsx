@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Alert, Dropdown, Layout, Menu, Space, Tag, Typography } from 'antd';
+import { Suspense, useState } from 'react';
+import { Alert, Dropdown, Layout, Menu, Space, Spin, Tag, Typography } from 'antd';
 import { DownOutlined, KeyOutlined, LogoutOutlined, UserOutlined } from '@ant-design/icons';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
@@ -74,7 +74,16 @@ export default function AppLayout() {
         <Content className="app-content">
           {/* Keyed by path so moving to another page clears a crashed one; the sidebar stays usable. */}
           <ErrorBoundary resetKey={pathname}>
-            <Outlet />
+            {/* Pages are lazy-loaded: the sidebar and header stay put while a page's code downloads. */}
+            <Suspense
+              fallback={
+                <div style={{ display: 'grid', placeItems: 'center', padding: 80 }}>
+                  <Spin size="large" />
+                </div>
+              }
+            >
+              <Outlet />
+            </Suspense>
           </ErrorBoundary>
         </Content>
       </Layout>

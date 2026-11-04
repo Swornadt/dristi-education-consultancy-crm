@@ -1,22 +1,26 @@
+import { lazy } from 'react';
 import { ConfigProvider } from 'antd';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import ProtectedRoute from './auth/ProtectedRoute';
 import { NAV_ITEMS } from './config/modules';
 import AppLayout from './layouts/AppLayout';
-import AccountsPage from './pages/accounts/AccountsPage';
-import ApplicationsPage from './pages/applications/ApplicationsPage';
-import CatalogPage from './pages/catalog/CatalogPage';
-import DashboardPage from './pages/DashboardPage';
 import ForbiddenPage from './pages/ForbiddenPage';
-import LeadsPage from './pages/leads/LeadsPage';
 import LoginPage from './pages/LoginPage';
 import ModulePlaceholder from './pages/ModulePlaceholder';
 import NotFoundPage from './pages/NotFoundPage';
-import UsersPage from './pages/users/UsersPage';
-import StudentsPage from './pages/students/StudentsPage';
-import TasksPage from './pages/tasks/TasksPage';
 import { theme } from './theme';
+
+// Each module page is its own chunk, downloaded the first time someone opens it.
+// Login, 403 and 404 stay in the main bundle so they always show instantly.
+const AccountsPage = lazy(() => import('./pages/accounts/AccountsPage'));
+const ApplicationsPage = lazy(() => import('./pages/applications/ApplicationsPage'));
+const CatalogPage = lazy(() => import('./pages/catalog/CatalogPage'));
+const DashboardPage = lazy(() => import('./pages/DashboardPage'));
+const LeadsPage = lazy(() => import('./pages/leads/LeadsPage'));
+const StudentsPage = lazy(() => import('./pages/students/StudentsPage'));
+const TasksPage = lazy(() => import('./pages/tasks/TasksPage'));
+const UsersPage = lazy(() => import('./pages/users/UsersPage'));
 
 // Replace a placeholder by adding the real page here, keyed by the NAV_ITEMS key.
 // Pages that need sub-routes (e.g. /leads/12) can render their own <Routes> inside.

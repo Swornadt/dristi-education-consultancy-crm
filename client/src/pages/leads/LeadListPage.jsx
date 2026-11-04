@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Alert, Button, Card, DatePicker, Input, Select, Space, Table, Typography, message } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
+import { Alert, Button, Card, DatePicker, Input, Select, Space, Table, Tooltip, Typography, message } from 'antd';
+import { DownloadOutlined, PlusOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { Link, useNavigate } from 'react-router-dom';
 import { listLeads } from '../../api/leads';
@@ -11,6 +11,7 @@ import { LEAD_SOURCES, LEAD_STATUSES, labelOf } from '../../config/leadOptions';
 import { formatDate, formatIntake } from '../../utils/format';
 import LeadFormModal from './LeadFormModal';
 import LeadViewToggle from './LeadViewToggle';
+import { exportLeads } from '../../utils/exportLeads';
 import useLeadLookups from './useLeadLookups';
 
 const DEFAULT_QUERY = { page: 1, limit: 20, sort: '-createdAt' };
@@ -27,6 +28,7 @@ export default function LeadListPage() {
   const [result, setResult] = useState({ data: [], meta: { total: 0 } });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [exporting, setExporting] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
 
   const seesAll = scopeOf('leads', 'view') === 'all';
@@ -53,6 +55,19 @@ export default function LeadListPage() {
 
   // Changing a filter always goes back to page 1.
   const setFilter = (patch) => setQuery((prev) => ({ ...prev, ...patch, page: 1 }));
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const filterParams = Object.fromEntries(Object.entries(query).filter(([k]) => FILTER_KEYS.includes(k)));
+      const count = await exportLeads(filterParams);
+      messageApi.success(`Exported ${count} lead${count !== 1 ? 's' : ''}`);
+    } catch {
+      messageApi.error('Export failed. Please try again.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const clearFilters = () => {
     setSearchText('');
     setQuery(DEFAULT_QUERY);
@@ -111,11 +126,18 @@ export default function LeadListPage() {
           </Typography.Title>
           <LeadViewToggle value="list" />
         </Space>
-        <Can module="leads" action="create">
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setFormOpen(true)}>
-            Add lead
-          </Button>
-        </Can>
+        <Space>
+          <Tooltip title={hasFilters ? 'Export filtered leads to CSV' : 'Export all leads to CSV'}>
+            <Button icon={<DownloadOutlined />} loading={exporting} onClick={handleExport}>
+              Export CSV
+            </Button>
+          </Tooltip>
+          <Can module="leads" action="create">
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => setFormOpen(true)}>
+              Add lead
+            </Button>
+          </Can>
+        </Space>
       </Space>
 
       <Card>

@@ -9,6 +9,8 @@ import studentsRoutes from './modules/students/students.routes';
 import * as subController from './modules/students/students.subresources.controller';
 import { verifyJWT } from './common/middleware/auth';
 import { globalErrorHandler } from './common/middleware/errorHandler';
+import catalogRoutes from './modules/catalog/catalog.routes';
+
 
 const app = express();
 app.use(cors());
@@ -20,6 +22,7 @@ app.use('/api/v1/roles', rolesRoutes);
 app.use('/api/v1/leads', leadsRoutes);
 app.use('/api/v1/tasks', taskRoutes);
 app.use('/api/v1/students', studentsRoutes);
+app.use('/api/v1/catalog', catalogRoutes);
 
 app.get('/api/v1/files/:fileId', verifyJWT, subController.streamFile);
 

@@ -15,8 +15,9 @@ import { formatMoney } from '../utils/money';
 
 function DaysLeft({ deadline }) {
   const days = dayjs(deadline).startOf('day').diff(dayjs().startOf('day'), 'day');
+  if (days < 0)  return <Tag color="red">Overdue</Tag>;
   if (days === 0) return <Tag color="red">Today</Tag>;
-  return <Tag color={days <= 7 ? 'gold' : 'default'}>{days} days</Tag>;
+  return <Tag color={days <= 7 ? 'gold' : 'default'}>{days} day{days !== 1 ? 's' : ''}</Tag>;
 }
 
 export default function DashboardPage() {
@@ -123,8 +124,9 @@ export default function DashboardPage() {
   const monthLabel = month.format('MMM YYYY');
 
   const statCards = [
-    { title: `New leads in ${monthLabel}`, value: data.newLeadsThisMonth, to: '/leads' },
-    { title: `Conversions in ${monthLabel}`, value: data.conversionsThisMonth, to: '/students' },
+    { title: `New leads — ${monthLabel}`, value: data.newLeadsThisMonth, to: '/leads' },
+    { title: `Conversions — ${monthLabel}`, value: data.conversionsThisMonth, to: '/students' },
+    // Tasks counts are always live, not filtered by the month picker.
     { title: 'Tasks due today', value: data.tasksDueToday, to: '/tasks?view=today' },
     { title: 'Overdue tasks', value: data.tasksOverdue, to: '/tasks?view=overdue', danger: data.tasksOverdue > 0 },
   ];

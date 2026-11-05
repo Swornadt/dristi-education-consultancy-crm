@@ -71,16 +71,21 @@ export default function TaskFormModal({ open, task, lead, counselors, onClose, o
 
     const payload = { title: values.title.trim(), dueAt: values.dueAt.toISOString() };
     const description = values.description?.trim();
-    if (values.assignedTo) payload.assignedTo = values.assignedTo;
 
     setSaving(true);
     setError(null);
     try {
       let saved;
       if (isEdit) {
-        saved = await updateTask(task.id, { ...payload, description: description || null });
+        // Send assignedTo explicitly so the user can clear it (null = unassign).
+        saved = await updateTask(task.id, {
+          ...payload,
+          description: description || null,
+          assignedTo: values.assignedTo ?? null,
+        });
       } else {
         if (description) payload.description = description;
+        if (values.assignedTo) payload.assignedTo = values.assignedTo;
         payload.leadId = lead ? lead.id : values.leadId;
         saved = await createTask(payload);
       }
@@ -140,7 +145,7 @@ export default function TaskFormModal({ open, task, lead, counselors, onClose, o
         </Form.Item>
         <Form.Item name="assignedTo" label="Assigned to">
           <Select
-            allowClear={false}
+            allowClear
             placeholder="Me"
             options={counselors.map((c) => ({ value: c.id, label: c.fullName }))}
           />

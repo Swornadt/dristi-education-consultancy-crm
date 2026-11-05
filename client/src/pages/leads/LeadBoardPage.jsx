@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Alert, Button, Card, Dropdown, Input, Modal, Select, Space, Tag, Typography, message, theme } from 'antd';
-import { MoreOutlined, PlusOutlined } from '@ant-design/icons';
+import { Alert, Button, Card, Dropdown, Input, Modal, Select, Space, Tag, Tooltip, Typography, message, theme } from 'antd';
+import { DownloadOutlined, MoreOutlined, PlusOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import { convertLead, listLeads, updateLeadStatus } from '../../api/leads';
 import { useAuth } from '../../auth/AuthContext';
@@ -9,6 +9,7 @@ import LeadStatusTag from '../../components/LeadStatusTag';
 import { LEAD_SOURCES, LEAD_STATUSES, labelOf } from '../../config/leadOptions';
 import { formatDate } from '../../utils/format';
 import { dropBlockedReason, moveCard } from '../../utils/boardUtils';
+import { exportLeads } from '../../utils/exportLeads';
 import LeadFormModal from './LeadFormModal';
 import LeadViewToggle from './LeadViewToggle';
 import LostReasonModal from './LostReasonModal';
@@ -36,11 +37,23 @@ export default function LeadBoardPage() {
   const [convertTarget, setConvertTarget] = useState(null);
   const [converting, setConverting] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const seesAll = scopeOf('leads', 'view') === 'all';
   const canUpdate = can('leads', 'update');
   const canConvert = canUpdate && can('students', 'create');
   const reload = () => setRefreshKey((k) => k + 1);
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const count = await exportLeads(filters);
+      messageApi.success(`Exported ${count} lead${count !== 1 ? 's' : ''}`);
+    } catch {
+      messageApi.error('Export failed. Please try again.');
+    } finally {
+      setExporting(false);
+    }
+  };
   const permissions = { canUpdate, canConvert };
 
   // One request per column, so every column shows its own total.
@@ -177,11 +190,18 @@ export default function LeadBoardPage() {
           </Typography.Title>
           <LeadViewToggle value="board" />
         </Space>
-        <Can module="leads" action="create">
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setFormOpen(true)}>
-            Add lead
-          </Button>
-        </Can>
+        <Space>
+          <Tooltip title="Export current filter to CSV">
+            <Button icon={<DownloadOutlined />} loading={exporting} onClick={handleExport}>
+              Export CSV
+            </Button>
+          </Tooltip>
+          <Can module="leads" action="create">
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => setFormOpen(true)}>
+              Add lead
+            </Button>
+          </Can>
+        </Space>
       </Space>
 
       <Space wrap style={{ marginBottom: 16 }}>

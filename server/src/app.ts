@@ -11,6 +11,10 @@ import dashboardRoutes from './modules/dashboard/dashboard.routes';
 import * as subController from './modules/students/students.subresources.controller';
 import { verifyJWT } from './common/middleware/auth';
 import { globalErrorHandler } from './common/middleware/errorHandler';
+import catalogRoutes from './modules/catalog/catalog.routes';
+import applicationsRoutes from './modules/applications/applications.routes';
+
+
 
 const app = express();
 app.use(cors());
@@ -24,6 +28,9 @@ app.use('/api/v1/tasks', taskRoutes);
 app.use('/api/v1/students', studentsRoutes);
 app.use('/api/v1/accounts', accountsRoutes);
 app.use('/api/v1/dashboard', dashboardRoutes);
+app.use('/api/v1/catalog', catalogRoutes);
+app.use('/api/v1/applications', applicationsRoutes);
+
 
 app.get('/api/v1/files/:fileId', verifyJWT, subController.streamFile);
 

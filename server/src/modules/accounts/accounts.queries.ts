@@ -1,12 +1,8 @@
 import { pool } from "../../config/db";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Categories
-// ─────────────────────────────────────────────────────────────────────────────
-
 export async function listCategories() {
   const { rows } = await pool.query(
-    `SELECT id, name, kind, is_active, updated_at
+    `SELECT id, name, kind, is_active
        FROM account_categories
        ORDER BY kind, name`,
   );
@@ -15,8 +11,8 @@ export async function listCategories() {
 
 export async function getCategoryById(id: number) {
   const { rows } = await pool.query(
-    `SELECT id, name, kind, is_active, updated_at
-+     FROM account_categories WHERE id = $1`,
+    `SELECT id, name, kind, is_active
+       FROM account_categories WHERE id = $1`,
     [id],
   );
   return rows[0] || null;
@@ -42,27 +38,24 @@ export async function updateCategory(
   id: number,
   data: { name?: string; isActive?: boolean },
 ) {
-  // updated_at is handled by the trigger added in migration 004.
-  let query = `UPDATE account_categories SET id = id`; // no-op anchor; real fields follow
+  const setClauses: string[] = [];
   const params: unknown[] = [];
 
   if (data.name !== undefined) {
     params.push(data.name);
-    query += `, name = $${params.length}`;
+    setClauses.push(`name = $${params.length}`);
   }
   if (data.isActive !== undefined) {
     params.push(data.isActive);
-    query += `, is_active = $${params.length}`;
+    setClauses.push(`is_active = $${params.length}`);
   }
 
+  if (setClauses.length === 0) return;
+
   params.push(id);
-  query += ` WHERE id = $${params.length}`;
+  const query = `UPDATE account_categories SET ${setClauses.join(", ")} WHERE id = $${params.length}`;
   await pool.query(query, params);
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Entries
-// ─────────────────────────────────────────────────────────────────────────────
 
 export interface EntryFilters {
   from?: string;
@@ -97,7 +90,6 @@ export async function listEntries(filters: EntryFilters) {
   }
   if (filters.q) {
     params.push(`%${filters.q}%`);
-    // Single param index referenced twice is valid in Postgres.
     where += ` AND (ae.description ILIKE $${params.length} OR ae.payee_name ILIKE $${params.length})`;
   }
 
@@ -110,7 +102,7 @@ export async function listEntries(filters: EntryFilters) {
     "-createdAt": "ae.created_at",
   };
   const sortField = sortMap[filters.sort ?? ""] ?? "ae.entry_date";
-  const sortDir = (filters.sort ?? "").startsWith("-") ? "DESC" : "DESC"; // default: newest first
+  const sortDir = (filters.sort ?? "").startsWith("-") ? "DESC" : "DESC";
 
   const page = Math.max(1, Number(filters.page) || 1);
   const limit = Math.min(100, Math.max(1, Number(filters.limit) || 20));
@@ -127,12 +119,15 @@ export async function listEntries(filters: EntryFilters) {
   params.push(limit, offset);
   const { rows } = await pool.query(
     `SELECT
-       ae.id, ae.entry_date, ae.amount, ae.description, ae.payee_name,
-       ae.period_month, ae.reference_no, ae.created_at, ae.updated_at,
+       ae.id,
+       to_char(ae.entry_date, 'YYYY-MM-DD') as entry_date,
+       ae.amount, ae.description, ae.payee_name,
+       to_char(ae.period_month, 'YYYY-MM-DD') as period_month,
+       ae.reference_no, ae.created_at, ae.updated_at,
        ae.created_by,
-       uc.full_name  AS created_by_name,
-       ac.id         AS category_id,
-       ac.name       AS category_name,
+       uc.full_name AS created_by_name,
+       ac.id   AS category_id,
+       ac.name AS category_name,
        ac.kind
      FROM account_entries ae
      JOIN account_categories ac ON ac.id = ae.category_id
@@ -149,17 +144,20 @@ export async function listEntries(filters: EntryFilters) {
 export async function getEntryById(id: number) {
   const { rows } = await pool.query(
     `SELECT
-       ae.id, ae.entry_date, ae.amount, ae.description, ae.payee_name,
-       ae.period_month, ae.reference_no, ae.created_at, ae.updated_at,
+       ae.id,
+       to_char(ae.entry_date, 'YYYY-MM-DD') as entry_date,
+       ae.amount, ae.description, ae.payee_name,
+       to_char(ae.period_month, 'YYYY-MM-DD') as period_month,
+       ae.reference_no, ae.created_at, ae.updated_at,
        ae.created_by,
-       uc.full_name  AS created_by_name,
-       ac.id         AS category_id,
-       ac.name       AS category_name,
+       uc.full_name AS created_by_name,
+       ac.id   AS category_id,
+       ac.name AS category_name,
        ac.kind
-       FROM account_entries ae
-       JOIN account_categories ac ON ac.id = ae.category_id
-     JOIN users             uc  ON uc.id = ae.created_by
-       WHERE ae.id = $1`,
+     FROM account_entries ae
+     JOIN account_categories ac ON ac.id = ae.category_id
+     JOIN users uc ON uc.id = ae.created_by
+     WHERE ae.id = $1`,
     [id],
   );
   return rows[0] || null;
@@ -178,8 +176,8 @@ export async function createEntry(data: {
   const { rows } = await pool.query(
     `INSERT INTO account_entries
        (category_id, entry_date, amount, description, payee_name,
-+        period_month, reference_no, created_by)
-+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+        period_month, reference_no, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
      RETURNING id`,
     [
       data.categoryId,
@@ -207,41 +205,42 @@ export async function updateEntry(
     referenceNo?: string;
   },
 ) {
-  // updated_at is handled by the trigger from 001_schema.sql.
-  let query = `UPDATE account_entries SET id = id`;
+  const setClauses: string[] = [];
   const params: unknown[] = [];
 
   if (data.categoryId !== undefined) {
     params.push(data.categoryId);
-    query += `, category_id = $${params.length}`;
+    setClauses.push(`category_id = $${params.length}`);
   }
   if (data.entryDate !== undefined) {
     params.push(data.entryDate);
-    query += `, entry_date = $${params.length}`;
+    setClauses.push(`entry_date = $${params.length}`);
   }
   if (data.amount !== undefined) {
     params.push(data.amount);
-    query += `, amount = $${params.length}`;
+    setClauses.push(`amount = $${params.length}`);
   }
   if (data.description !== undefined) {
     params.push(data.description);
-    query += `, description = $${params.length}`;
+    setClauses.push(`description = $${params.length}`);
   }
   if (data.payeeName !== undefined) {
     params.push(data.payeeName);
-    query += `, payee_name = $${params.length}`;
+    setClauses.push(`payee_name = $${params.length}`);
   }
   if (data.periodMonth !== undefined) {
     params.push(data.periodMonth);
-    query += `, period_month = $${params.length}`;
+    setClauses.push(`period_month = $${params.length}`);
   }
   if (data.referenceNo !== undefined) {
     params.push(data.referenceNo);
-    query += `, reference_no = $${params.length}`;
+    setClauses.push(`reference_no = $${params.length}`);
   }
 
+  if (setClauses.length === 0) return;
+
   params.push(id);
-  query += ` WHERE id = $${params.length}`;
+  const query = `UPDATE account_entries SET ${setClauses.join(", ")} WHERE id = $${params.length}`;
   await pool.query(query, params);
 }
 
@@ -249,15 +248,11 @@ export async function deleteEntry(id: number) {
   await pool.query(`DELETE FROM account_entries WHERE id = $1`, [id]);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Summary
-// ─────────────────────────────────────────────────────────────────────────────
-
 export async function getSummary(monthStart: string) {
   const { rows } = await pool.query(
     `SELECT
-       ac.id    AS category_id,
-       ac.name  AS category_name,
+       ac.id   AS category_id,
+       ac.name AS category_name,
        ac.kind,
        COALESCE(SUM(ae.amount), 0)::float AS total
      FROM account_categories ac

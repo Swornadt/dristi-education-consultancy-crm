@@ -28,7 +28,7 @@ app.use('/api/v1/tasks', taskRoutes);
 app.use('/api/v1/students', studentsRoutes);
 app.use('/api/v1/accounts', accountsRoutes);
 app.use('/api/v1/dashboard', dashboardRoutes);
-app.use('/api/v1/catalog', catalogRoutes);
+app.use('/api/v1/', catalogRoutes);
 app.use('/api/v1/applications', applicationsRoutes);
 
 

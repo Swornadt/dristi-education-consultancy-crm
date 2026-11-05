@@ -32,8 +32,13 @@ export async function exportLeads(filters = {}) {
 
   while (true) {
     const res = await listLeads({ ...filters, page, limit: PAGE, sort: 'createdAt' });
-    all.push(...res.data);
-    if (all.length >= res.meta.total || res.data.length < PAGE) break;
+    const rows = res?.data ?? [];
+    const total = res?.meta?.total ?? 0;
+
+    all.push(...rows);
+
+    // Stop if we reached total records or if returned batch is less than request page size
+    if ((total > 0 && all.length >= total) || rows.length < PAGE) break;
     page += 1;
   }
 

@@ -61,8 +61,9 @@ export default function LeadListPage() {
       const filterParams = Object.fromEntries(Object.entries(query).filter(([k]) => FILTER_KEYS.includes(k)));
       const count = await exportLeads(filterParams);
       messageApi.success(`Exported ${count} lead${count !== 1 ? 's' : ''}`);
-    } catch {
+    } catch (err) {
       messageApi.error('Export failed. Please try again.');
+      console.log(err)
     } finally {
       setExporting(false);
     }

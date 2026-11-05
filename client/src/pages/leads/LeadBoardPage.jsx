@@ -48,8 +48,9 @@ export default function LeadBoardPage() {
     try {
       const count = await exportLeads(filters);
       messageApi.success(`Exported ${count} lead${count !== 1 ? 's' : ''}`);
-    } catch {
-      messageApi.error('Export failed. Please try again.');
+    } catch (err) {
+      console.error('Export failed:', err);
+  messageApi.error(err?.message || 'Export failed. Please try again.');
     } finally {
       setExporting(false);
     }

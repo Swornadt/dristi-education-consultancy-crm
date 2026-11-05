@@ -76,7 +76,7 @@ export default function DocumentChecklist({ studentId }) {
   const canUpdate = can('documents', 'update');
   const { checklist, leadAttachments } = data;
   const verified = checklist.filter((i) => i.status === 'verified').length;
-  const availableTypes = docTypes.filter((t) => !checklist.some((i) => i.documentType.id === t.id));
+  const availableTypes = docTypes.filter((t) => !checklist.some((i) => i.documentType?.id === t.id));
 
   const columns = [
     { title: 'Document', dataIndex: ['documentType', 'name'] },

@@ -115,7 +115,20 @@ export default function LeadFormModal({ open, lead, countries, counselors, onClo
             </Form.Item>
           </Col>
           <Col xs={24} sm={12}>
-            <Form.Item name="email" label="Email" rules={[{ type: 'email', message: 'Enter a valid email address.' }]}>
+            <Form.Item
+              name="email"
+              label="Email"
+              dependencies={['phone']}
+              rules={[
+                { type: 'email', message: 'Enter a valid email address.' },
+                ({ getFieldValue }) => ({
+                  validator(_, value) {
+                    if (value || getFieldValue('phone')) return Promise.resolve();
+                    return Promise.reject(new Error('Enter a phone number or an email.'));
+                  },
+                }),
+              ]}
+            >
               <Input />
             </Form.Item>
           </Col>
@@ -175,7 +188,7 @@ export default function LeadFormModal({ open, lead, countries, counselors, onClo
 
         <Form.Item name="assignedTo" label="Assigned counselor">
           <Select
-            allowClear={!isEdit}
+            allowClear
             placeholder="Unassigned"
             options={counselors.map((c) => ({ value: c.id, label: c.fullName }))}
           />

@@ -152,7 +152,7 @@ export default function StudentListPage() {
           pagination={{
             current: query.page,
             pageSize: query.limit,
-            total: result.meta.total,
+            total: result?.meta?.total ?? 0,
             showSizeChanger: true,
             showTotal: (total) => `${total} students`,
           }}

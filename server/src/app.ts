@@ -7,6 +7,7 @@ import leadsRoutes from './modules/leads/leads.routes';
 import taskRoutes from './modules/tasks/tasks.routes';
 import studentsRoutes from './modules/students/students.routes';
 import accountsRoutes from './modules/accounts/accounts.routes';
+import dashboardRoutes from './modules/dashboard/dashboard.routes';
 import * as subController from './modules/students/students.subresources.controller';
 import { verifyJWT } from './common/middleware/auth';
 import { globalErrorHandler } from './common/middleware/errorHandler';
@@ -22,6 +23,7 @@ app.use('/api/v1/leads', leadsRoutes);
 app.use('/api/v1/tasks', taskRoutes);
 app.use('/api/v1/students', studentsRoutes);
 app.use('/api/v1/accounts', accountsRoutes);
+app.use('/api/v1/dashboard', dashboardRoutes);
 
 app.get('/api/v1/files/:fileId', verifyJWT, subController.streamFile);
 

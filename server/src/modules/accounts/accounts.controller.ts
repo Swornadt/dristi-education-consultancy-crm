@@ -1,10 +1,11 @@
 import { Request, Response } from 'express';
 import { asyncHandler } from '../../common/utils/asyncHandler';
+import { JwtPayload } from '../../types/auth';
 import * as service from './accounts.service';
 
 // ── Categories ────────────────────────────────────────────────────────────────
 
-export const listCategories = asyncHandler(async (_req: Request, res: Response) => {
+export const listCategories = asyncHandler(async (req: Request, res: Response) => {
   res.json(await service.listCategories());
 });
 
@@ -22,8 +23,12 @@ export const listEntries = asyncHandler(async (req: Request, res: Response) => {
   res.json(await service.listEntries(req.query));
 });
 
+export const getEntry = asyncHandler(async (req: Request, res: Response) => {
+  res.json(await service.getEntry(Number(req.params.id)));
+});
+
 export const createEntry = asyncHandler(async (req: Request, res: Response) => {
-  res.status(201).json(await service.createEntry(req.body));
+  res.status(201).json(await service.createEntry(req.user as JwtPayload, req.body));
 });
 
 export const updateEntry = asyncHandler(async (req: Request, res: Response) => {

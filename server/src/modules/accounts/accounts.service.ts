@@ -1,33 +1,38 @@
-import { AppError } from '../../common/errors/AppError';
-import * as queries from './accounts.queries';
+import { AppError } from "../../common/errors/AppError";
+import { JwtPayload } from "../../types/auth";
+import * as queries from "./accounts.queries";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Mappers
 // ─────────────────────────────────────────────────────────────────────────────
 
 const mapCategory = (row: any) => ({
-  id:        Number(row.id),
-  name:      row.name as string,
-  kind:      row.kind as 'income' | 'expense',
-  isActive:  row.is_active as boolean,
-  createdAt: row.created_at as string,
+  id: Number(row.id),
+  name: row.name as string,
+  kind: row.kind as "income" | "expense",
+  isActive: row.is_active as boolean,
+  updatedAt: row.updated_at as string,
 });
 
 const mapEntry = (row: any) => ({
-  id:          Number(row.id),
+  id: Number(row.id),
   category: {
-    id:   Number(row.category_id),
+    id: Number(row.category_id),
     name: row.category_name as string,
-    kind: row.kind as 'income' | 'expense',
+    kind: row.kind as "income" | "expense",
   },
-  entryDate:   row.entry_date as string,
-  amount:      Number(row.amount),
+  entryDate: row.entry_date as string,
+  amount: Number(row.amount),
   description: row.description as string | null,
-  payeeName:   row.payee_name  as string | null,
+  payeeName: row.payee_name as string | null,
   periodMonth: row.period_month as string | null,
   referenceNo: row.reference_no as string | null,
-  createdAt:   row.created_at  as string,
-  updatedAt:   row.updated_at  as string,
+  createdBy: {
+    id: Number(row.created_by),
+    fullName: row.created_by_name as string,
+  },
+  createdAt: row.created_at as string,
+  updatedAt: row.updated_at as string,
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -39,24 +44,39 @@ export async function listCategories() {
   return rows.map(mapCategory);
 }
 
-export async function createCategory(data: { name: string; kind: 'income' | 'expense' }) {
+export async function createCategory(data: {
+  name: string;
+  kind: "income" | "expense";
+}) {
   // Names must be unique (case-insensitive) to keep the category list clean.
   const existing = await queries.getCategoryByName(data.name);
-  if (existing) throw new AppError('CONFLICT', `A category named "${data.name}" already exists`, 409);
+  if (existing)
+    throw new AppError(
+      "CONFLICT",
+      `A category named "${data.name}" already exists`,
+      409,
+    );
 
   const id = await queries.createCategory(data.name, data.kind);
   const row = await queries.getCategoryById(id);
   return mapCategory(row);
 }
 
-export async function updateCategory(id: number, data: { name?: string; isActive?: boolean }) {
+export async function updateCategory(
+  id: number,
+  data: { name?: string; isActive?: boolean },
+) {
   const existing = await queries.getCategoryById(id);
-  if (!existing) throw new AppError('NOT_FOUND', 'Category not found', 404);
+  if (!existing) throw new AppError("NOT_FOUND", "Category not found", 404);
 
   if (data.name) {
     const dup = await queries.getCategoryByName(data.name);
     if (dup && Number(dup.id) !== id) {
-      throw new AppError('CONFLICT', `A category named "${data.name}" already exists`, 409);
+      throw new AppError(
+        "CONFLICT",
+        `A category named "${data.name}" already exists`,
+        409,
+      );
     }
   }
 
@@ -81,8 +101,12 @@ export async function listEntries(filters: queries.EntryFilters) {
       },
     };
   } catch (err: any) {
-    if (err.code === '22P02' || err.code === '22007') {
-      throw new AppError('VALIDATION_ERROR', 'Invalid filter value provided', 400);
+    if (err.code === "22P02" || err.code === "22007") {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "Invalid filter value provided",
+        400,
+      );
     }
     throw err;
   }
@@ -90,43 +114,49 @@ export async function listEntries(filters: queries.EntryFilters) {
 
 export async function getEntry(id: number) {
   const row = await queries.getEntryById(id);
-  if (!row) throw new AppError('NOT_FOUND', 'Entry not found', 404);
+  if (!row) throw new AppError("NOT_FOUND", "Entry not found", 404);
   return mapEntry(row);
 }
 
-export async function createEntry(data: {
-  categoryId:   number;
-  entryDate:    string;
-  amount:       number;
+export async function createEntry(p0: JwtPayload, data: {
+  categoryId: number;
+  entryDate: string;
+  amount: number;
   description?: string;
-  payeeName?:   string;
+  payeeName?: string;
   periodMonth?: string;
   referenceNo?: string;
+  createdBy: number;
 }) {
   // Verify the category exists and is active.
   const cat = await queries.getCategoryById(data.categoryId);
-  if (!cat)             throw new AppError('VALIDATION_ERROR', 'Category not found', 400);
-  if (!cat.is_active)   throw new AppError('VALIDATION_ERROR', 'Category is inactive', 400);
+  if (!cat) throw new AppError("VALIDATION_ERROR", "Category not found", 400);
+  if (!cat.is_active)
+    throw new AppError("VALIDATION_ERROR", "Category is inactive", 400);
 
   const id = await queries.createEntry(data);
   return getEntry(id);
 }
 
-export async function updateEntry(id: number, data: {
-  categoryId?:  number;
-  entryDate?:   string;
-  amount?:      number;
-  description?: string;
-  payeeName?:   string;
-  periodMonth?: string;
-  referenceNo?: string;
-}) {
+export async function updateEntry(
+  id: number,
+  data: {
+    categoryId?: number;
+    entryDate?: string;
+    amount?: number;
+    description?: string;
+    payeeName?: string;
+    periodMonth?: string;
+    referenceNo?: string;
+  },
+) {
   await getEntry(id); // 404 if missing
 
   if (data.categoryId !== undefined) {
     const cat = await queries.getCategoryById(data.categoryId);
-    if (!cat)           throw new AppError('VALIDATION_ERROR', 'Category not found', 400);
-    if (!cat.is_active) throw new AppError('VALIDATION_ERROR', 'Category is inactive', 400);
+    if (!cat) throw new AppError("VALIDATION_ERROR", "Category not found", 400);
+    if (!cat.is_active)
+      throw new AppError("VALIDATION_ERROR", "Category is inactive", 400);
   }
 
   await queries.updateEntry(id, data);
@@ -144,30 +174,30 @@ export async function deleteEntry(id: number) {
 
 export async function getSummary(month?: string) {
   // month is "YYYY-MM"; convert to the first day of that month for the query.
-  const target  = month ?? new Date().toISOString().slice(0, 7); // e.g. "2026-11"
+  const target = month ?? new Date().toISOString().slice(0, 7); // e.g. "2026-11"
   const monthStart = `${target}-01`;
 
   const rows = await queries.getSummary(monthStart);
 
-  let totalIncome  = 0;
+  let totalIncome = 0;
   let totalExpense = 0;
   const byCategory = rows.map((r: any) => {
     const total = Number(r.total);
-    if (r.kind === 'income')  totalIncome  += total;
-    if (r.kind === 'expense') totalExpense += total;
+    if (r.kind === "income") totalIncome += total;
+    if (r.kind === "expense") totalExpense += total;
     return {
       categoryId: Number(r.category_id),
-      name:       r.category_name as string,
-      kind:       r.kind as 'income' | 'expense',
+      name: r.category_name as string,
+      kind: r.kind as "income" | "expense",
       total,
     };
   });
 
   return {
-    month:        target,
+    month: target,
     totalIncome,
     totalExpense,
-    net:          totalIncome - totalExpense,
+    net: totalIncome - totalExpense,
     byCategory,
   };
 }

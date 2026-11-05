@@ -40,8 +40,10 @@ export default function LeadDocumentsCard({ lead }) {
   useEffect(() => {
     listDocumentTypes()
       .then(setDocTypes)
-      .catch(() => {})
-      .finally(console.log(docTypes));
+      .catch(() => {
+        // Document types are optional for uploads; a silent failure just means the
+        // type picker stays empty. No need to surface this to the user.
+      });
   }, []);
 
   const run = async (action, successText) => {

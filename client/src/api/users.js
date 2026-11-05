@@ -18,8 +18,8 @@ export const createUser = (payload) => (USE_MOCK ? mock.createUser(payload) : bo
 export const updateUser = (id, payload) =>
   USE_MOCK ? mock.updateUser(id, payload) : body(api.patch(`/users/${id}`, payload));
 
-// GET /roles -> [{ id, name, description, permissions: [{ module, action, scope }] }]
-export const listRoles = () => (USE_MOCK ? mock.listRoles() : api.get('/roles').then((r) => unwrapList(r.data)));
+// GET /users/roles -> [{ id, name, description, permissions: [{ module, action, scope }] }]
+export const listRoles = () => (USE_MOCK ? mock.listRoles() : api.get('/users/roles').then((r) => unwrapList(r.data)));
 
 // PUT /roles/:id/permissions { permissions: [{ module, action, scope }] } replaces the role's matrix.
 // The admin role can't be edited (409). Returns the updated role.

@@ -1,15 +1,10 @@
 import { pool } from '../../config/db';
 
-// All queries accept a scope: 'all' (admin) sees every record;
-// 'own' (counselor) sees only records assigned to or created by that user.
-
 function ownFilter(alias: string, userId: number, params: unknown[]): string {
   params.push(userId);
   const n = params.length;
   return `AND (${alias}.assigned_to = $${n} OR ${alias}.created_by = $${n})`;
 }
-
-// ── Leads ─────────────────────────────────────────────────────────────────────
 
 export async function leadsByStatus(scope: string, userId: number) {
   const params: unknown[] = [];
@@ -63,8 +58,6 @@ export async function conversionsThisMonth(monthStart: string, scope: string, us
   return Number(rows[0].count);
 }
 
-// ── Tasks ─────────────────────────────────────────────────────────────────────
-
 export async function tasksDueToday(scope: string, userId: number) {
   const params: unknown[] = [];
   const own = scope === 'own' ? ownFilter('t', userId, params) : '';
@@ -94,12 +87,8 @@ export async function tasksOverdue(scope: string, userId: number) {
   return Number(rows[0].count);
 }
 
-// ── Applications ──────────────────────────────────────────────────────────────
-
 export async function applicationsByStatus(scope: string, userId: number) {
   const params: unknown[] = [];
-  // Applications have created_by but not assigned_to; for 'own' scope we match
-  // created_by or the linked student's assigned_to (the counselor).
   let own = '';
   if (scope === 'own') {
     params.push(userId);
@@ -131,7 +120,7 @@ export async function upcomingDeadlines(scope: string, userId: number) {
        s.full_name   AS student_name,
        u.name        AS university,
        p.name        AS program,
-       a.deadline
+       to_char(a.deadline, 'YYYY-MM-DD') AS deadline
      FROM applications a
      JOIN students     s  ON s.id  = a.student_id
      JOIN program_intakes pi ON pi.id = a.program_intake_id

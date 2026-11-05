@@ -2,16 +2,11 @@ import { AppError } from "../../common/errors/AppError";
 import { JwtPayload } from "../../types/auth";
 import * as queries from "./accounts.queries";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Mappers
-// ─────────────────────────────────────────────────────────────────────────────
-
 const mapCategory = (row: any) => ({
   id: Number(row.id),
   name: row.name as string,
   kind: row.kind as "income" | "expense",
   isActive: row.is_active as boolean,
-  updatedAt: row.updated_at as string,
 });
 
 const mapEntry = (row: any) => ({
@@ -35,10 +30,6 @@ const mapEntry = (row: any) => ({
   updatedAt: row.updated_at as string,
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Categories
-// ─────────────────────────────────────────────────────────────────────────────
-
 export async function listCategories() {
   const rows = await queries.listCategories();
   return rows.map(mapCategory);
@@ -48,7 +39,6 @@ export async function createCategory(data: {
   name: string;
   kind: "income" | "expense";
 }) {
-  // Names must be unique (case-insensitive) to keep the category list clean.
   const existing = await queries.getCategoryByName(data.name);
   if (existing)
     throw new AppError(
@@ -84,10 +74,6 @@ export async function updateCategory(
   return mapCategory(await queries.getCategoryById(id));
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Entries
-// ─────────────────────────────────────────────────────────────────────────────
-
 export async function listEntries(filters: queries.EntryFilters) {
   try {
     const { rows, total, page, limit } = await queries.listEntries(filters);
@@ -102,11 +88,7 @@ export async function listEntries(filters: queries.EntryFilters) {
     };
   } catch (err: any) {
     if (err.code === "22P02" || err.code === "22007") {
-      throw new AppError(
-        "VALIDATION_ERROR",
-        "Invalid filter value provided",
-        400,
-      );
+      throw new AppError("VALIDATION_ERROR", "Invalid filter value provided", 400);
     }
     throw err;
   }
@@ -118,7 +100,7 @@ export async function getEntry(id: number) {
   return mapEntry(row);
 }
 
-export async function createEntry(p0: JwtPayload, data: {
+export async function createEntry(user: JwtPayload, data: {
   categoryId: number;
   entryDate: string;
   amount: number;
@@ -126,16 +108,38 @@ export async function createEntry(p0: JwtPayload, data: {
   payeeName?: string;
   periodMonth?: string;
   referenceNo?: string;
-  createdBy: number;
 }) {
-  // Verify the category exists and is active.
   const cat = await queries.getCategoryById(data.categoryId);
   if (!cat) throw new AppError("VALIDATION_ERROR", "Category not found", 400);
   if (!cat.is_active)
     throw new AppError("VALIDATION_ERROR", "Category is inactive", 400);
 
-  const id = await queries.createEntry(data);
-  return getEntry(id);
+  try {
+    const id = await queries.createEntry({
+      ...data,
+      createdBy: user.id,
+    });
+    return getEntry(id);
+  } catch (err: any) {
+    if (err.code === "23514") {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "periodMonth must be the first day of the month (YYYY-MM-01)",
+        400,
+      );
+    }
+    if (err.code === "23503") {
+      throw new AppError("VALIDATION_ERROR", "Category not found", 400);
+    }
+    if (err.code === "22003") {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "amount is too large (max 9999999999.99)",
+        400,
+      );
+    }
+    throw err;
+  }
 }
 
 export async function updateEntry(
@@ -150,7 +154,7 @@ export async function updateEntry(
     referenceNo?: string;
   },
 ) {
-  await getEntry(id); // 404 if missing
+  await getEntry(id);
 
   if (data.categoryId !== undefined) {
     const cat = await queries.getCategoryById(data.categoryId);
@@ -159,22 +163,38 @@ export async function updateEntry(
       throw new AppError("VALIDATION_ERROR", "Category is inactive", 400);
   }
 
-  await queries.updateEntry(id, data);
-  return getEntry(id);
+  try {
+    await queries.updateEntry(id, data);
+    return getEntry(id);
+  } catch (err: any) {
+    if (err.code === "23514") {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "periodMonth must be the first day of the month (YYYY-MM-01)",
+        400,
+      );
+    }
+    if (err.code === "23503") {
+      throw new AppError("VALIDATION_ERROR", "Category not found", 400);
+    }
+    if (err.code === "22003") {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "amount is too large (max 9999999999.99)",
+        400,
+      );
+    }
+    throw err;
+  }
 }
 
 export async function deleteEntry(id: number) {
-  await getEntry(id); // 404 if missing
+  await getEntry(id);
   await queries.deleteEntry(id);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Summary
-// ─────────────────────────────────────────────────────────────────────────────
-
 export async function getSummary(month?: string) {
-  // month is "YYYY-MM"; convert to the first day of that month for the query.
-  const target = month ?? new Date().toISOString().slice(0, 7); // e.g. "2026-11"
+  const target = month ?? new Date().toISOString().slice(0, 7);
   const monthStart = `${target}-01`;
 
   const rows = await queries.getSummary(monthStart);

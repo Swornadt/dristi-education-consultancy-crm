@@ -63,11 +63,23 @@ export async function changePassword(userId: number, currentPlain: string, newPl
   const user = await queries.findUserById(userId);
   if (!user) throw new AppError('NOT_FOUND', 'User not found', 404);
 
+  //Check current password is correct
   const isValid = await bcrypt.compare(currentPlain, user.password_hash);
   if (!isValid) {
     throw new AppError('VALIDATION_ERROR', 'Incorrect current password', 400);
   }
 
+  // strictly Check if new password is the same as the current one
+  const isSamePassword = await bcrypt.compare(newPlain, user.password_hash);
+  if (isSamePassword) {
+    throw new AppError(
+      'VALIDATION_ERROR',
+      'New password cannot be the same as the current password',
+      400
+    );
+  }
+
+  //hash and save the new password
   const newHash = await bcrypt.hash(newPlain, 10);
   await queries.updatePassword(userId, newHash);
   await queries.incrementTokenVersion(userId);

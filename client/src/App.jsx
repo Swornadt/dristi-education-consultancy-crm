@@ -10,6 +10,7 @@ import LoginPage from './pages/LoginPage';
 import ModulePlaceholder from './pages/ModulePlaceholder';
 import NotFoundPage from './pages/NotFoundPage';
 import { theme } from './theme';
+import LandingPage from './pages/landing/LandingPage';
 
 // Each module page is its own chunk, downloaded the first time someone opens it.
 // Login, 403 and 404 stay in the main bundle so they always show instantly.
@@ -33,6 +34,7 @@ const PAGES = {
   catalog: <CatalogPage />,
   accounts: <AccountsPage />,
   users: <UsersPage />,
+  landing: <LandingPage />
 };
 
 // "/" sends each role to the first module it can view (front desk has no dashboard, for example).
@@ -48,6 +50,7 @@ export default function App() {
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/welcome" element={<LandingPage />} />
           <Route
             path="/"
             element={

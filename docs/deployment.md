@@ -24,7 +24,7 @@ Open http://localhost:8080. The database runs the migrations in `server/db` on f
 | A VPS | Install Docker, copy the repo, run the same compose file, and put HTTPS in front (Caddy is the simplest) |
 | A container platform (Render, Fly.io, Cloud Run and similar) | Deploy `server` and `client` as two services from their Dockerfiles, and use a managed Postgres such as Neon |
 
-When the front end and API are on different hosts, build the client with `VITE_API_URL` set to the API's full address and set `CORS_ORIGIN` on the API to the front end's address.
+When the front end and API are on different hosts, build the client with `VITE_API_URL` set to the API's full address including `/api/v1`. The API currently allows requests from any origin (`cors()` in `app.ts`), so no CORS setting is needed. Restrict it before real use.
 
 ## API environment variables
 

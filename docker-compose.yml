@@ -29,7 +29,6 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD}
       DB_NAME: crm
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
-      CORS_ORIGIN: http://localhost:${WEB_PORT:-8080}
     depends_on:
       db:
         condition: service_healthy
@@ -41,9 +40,9 @@ services:
     build:
       context: ./client
       args:
-        VITE_API_URL: /api
+        VITE_API_URL: /api/v1
     environment:
-      API_UPSTREAM: http://api:4000/
+      API_UPSTREAM: http://api:4000
     ports:
       - "${WEB_PORT:-8080}:80"
     depends_on:

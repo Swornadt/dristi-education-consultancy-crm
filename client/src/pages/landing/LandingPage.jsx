@@ -8,7 +8,9 @@ const CONFIG = {
   repoUrl: 'https://github.com/Swornadt/intern-consultancy-crm',   // GitHub link
   builders: 'Sworna D. Tuladhar and Eijkeyal Pakhrin',            // shown in the footer
   demoLogins: [
-    { role: 'Admin', email: 'admin@example.com', password: 'user123' },
+    { role: 'Admin', email: 'admin1@test.com', password: 'Password123!' },
+    { role: 'Counselor', email: 'counselor1@test.com', password: 'Password123!' },
+    { role: 'Front Desk', email: 'frontdesk1@test.com', password: 'Password123!' }
   ],
 };
 

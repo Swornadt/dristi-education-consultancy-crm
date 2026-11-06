@@ -7,7 +7,7 @@ cp .env.example .env      # then set POSTGRES_PASSWORD and JWT_SECRET
 docker compose up --build
 ```
 
-Open http://localhost:8080. The database runs the migrations in `server/db` on first start only. To start again from scratch: `docker compose down -v`.
+Open http://localhost:8080. The database runs the migrations in `server/src/db/migrations` on first start only. To start again from scratch: `docker compose down -v`.
 
 ## Containers
 

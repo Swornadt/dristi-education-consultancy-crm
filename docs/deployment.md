@@ -26,6 +26,17 @@ Open http://localhost:8080. The database runs the migrations in `server/db` on f
 
 When the front end and API are on different hosts, build the client with `VITE_API_URL` set to the API's full address and set `CORS_ORIGIN` on the API to the front end's address.
 
+## API environment variables
+
+The server reads these (see `server/src/config/env.ts`):
+
+| Variable | Purpose |
+|---|---|
+| `JWT_SECRET` | Signs login tokens. Required. |
+| `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` | Database connection. Required except the port (default 5432). |
+| `PORT` | Port to listen on (default 5001). |
+| `PGSSLMODE` | Set to `require` for managed databases such as Neon, so the connection uses SSL. The `pg` library reads it automatically. |
+
 ## Production checklist
 
 - Strong `JWT_SECRET` and database password, kept out of git.
